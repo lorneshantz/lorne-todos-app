@@ -46,25 +46,32 @@ $('#edit').addEventListener('close',()=>{if($('#edit').returnValue!=='save')retu
  commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x)return;const oldDue=x.due,oldTime=x.dueTime;Object.assign(x,v,{updated:now()});if(!x.assignee)delete x.assignee;if(!x.due)delete x.due;if(!x.dueTime||!x.due)delete x.dueTime;if(x.due!==oldDue||x.dueTime!==oldTime)unmark(x.id);if(!D.lists.includes(v.list))D.lists.push(v.list)},`Edit ${v.title}`)});
 function openSettings(){$('#setForm').token.value='';$('#settings').showModal()}
 $('#settings').addEventListener('close',()=>{const v=$('#settings').returnValue;
- if(v==='save'){const t=$('#setForm').token.value.trim();if(t){localStorage.setItem('gh_token',t);load()}}
- if(v==='signout'){localStorage.removeItem('gh_token');localStorage.removeItem('cache');data=null;render();status('Signed out')}});
+ if(v==='save'){const t=$('#setForm').token.value.trim();if(t){localStorage.setItem('gh_token',t);load();people=null;loadPeople()}}
+ if(v==='signout'){localStorage.removeItem('gh_token');localStorage.removeItem('cache');localStorage.removeItem('pcache');people=null;pmsg('Add your GitHub key in ⚙ to load people.');data=null;render();status('Signed out')}});
 $('#settingsBtn').onclick=openSettings;$('#refresh').onclick=load;$('#filter').oninput=render;
 $('#showDone').checked=localStorage.getItem('showDone')==='1';$('#showDone').onchange=e=>{localStorage.setItem('showDone',e.target.checked?'1':'0');render()};
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');load();
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{if(!r)return;r.update();document.addEventListener('visibilitychange',()=>{if(!document.hidden)r.update()})});
+ let reloaded=false;const hadCtl=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadCtl&&!reloaded){reloaded=true;location.reload()}})}load();
 // ---- People ----
 const PAPI=`https://api.github.com/repos/${OWNER}/${REPO}/contents/people.json`;
 let people=null,psha=null,pidx=null,view=localStorage.getItem('view')||'todos';
 async function fetchPeople(){const r=await fetch(PAPI+'?ref='+BRANCH+'&t='+Date.now(),{headers:{Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'},cache:'no-store'});
- if(r.status===404){people={people:[]};psha=null;return}if(!r.ok)throw new Error('HTTP '+r.status);
+ if(r.status===404){people={people:[]};psha=null;return}if(r.status===401||r.status===403)throw new Error('auth');if(!r.ok)throw new Error('HTTP '+r.status);
  const j=await r.json();psha=j.sha;people=JSON.parse(b64d(j.content));people.people=people.people||[];localStorage.setItem('pcache',JSON.stringify(people))}
-async function loadPeople(){if(!tok())return;try{await fetchPeople()}catch(e){const c=localStorage.getItem('pcache');if(c)people=JSON.parse(c)}renderPeople()}
+function pmsg(m){$('#plist').innerHTML=`<p class="empty">${esc(m)}</p>`}
+async function loadPeople(){if(!tok()){pmsg('Add your GitHub key in ⚙ to load people.');return}
+ if(!people)pmsg('Loading people…');
+ try{await fetchPeople()}catch(e){const c=localStorage.getItem('pcache');
+  if(c){people=JSON.parse(c);status('Offline/error — showing saved people ('+e.message+')')}
+  else{people=null;pmsg(e.message==='auth'?'GitHub key was rejected. Update it in ⚙ (needs Contents read/write on lorne-todos).':'Could not load people: '+e.message+'. Tap ⟳ to retry.');return}}
+ renderPeople()}
 async function commitPeople(change,msg){if(!navigator.onLine){alert('Offline — changes need a connection');return}
  for(let i=0;i<3;i++){change(people);renderPeople();const body={message:msg,content:b64e(JSON.stringify(people,null,2)+'\n'),branch:BRANCH};if(psha)body.sha=psha;
   const r=await fetch(PAPI,{method:'PUT',headers:{Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'},body:JSON.stringify(body)});
   if(r.ok){psha=(await r.json()).content.sha;localStorage.setItem('pcache',JSON.stringify(people));status('Saved');return}
   if(r.status===409||r.status===422){status('Conflict — retrying');await fetchPeople();continue}status('Save failed: HTTP '+r.status);return}
  status('Save failed after retries');await loadPeople()}
-function renderPeople(){if(!people)return;const ps=[...people.people].map((p,i)=>({...p,i})).sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base'}));
+function renderPeople(){if(!people)return;if(!people.people.length){$('#peopleNames').innerHTML='';pmsg('No people yet — tap + Add person.');return}const ps=[...people.people].map((p,i)=>({...p,i})).sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base'}));
  $('#peopleNames').innerHTML=ps.map(p=>`<option value="${esc(p.name)}">`).join('');
  $('#plist').innerHTML=ps.map(p=>`<div class="item"><div class="body"><div class="t">${esc(p.name)}</div><div class="meta">${p.email?`✉ <a href="mailto:${esc(p.email)}">${esc(p.email)}</a>`:'✉ —'}${p.cell?` · 📱 <a href="tel:${esc(p.cell)}">${esc(p.cell)}</a>`:''}</div></div><button class="ed" data-i="${p.i}">✎</button></div>`).join('')||'<p class="empty">No people yet.</p>';
  $('#plist').querySelectorAll('.ed').forEach(b=>b.onclick=()=>openPerson(+b.dataset.i))}
@@ -73,7 +80,7 @@ function openPerson(i){pidx=i;const p=i==null?{name:'',email:'',cell:''}:people.
 $('#pedit').addEventListener('close',()=>{if($('#pedit').returnValue!=='save')return;const F=$('#pForm'),old=pidx==null?null:people.people[pidx].name;
  const v={name:F.name.value.trim(),email:F.email.value.trim()||null,cell:F.cell.value.trim()||null};if(!v.name)return;
  commitPeople(P=>{const j=old==null?-1:P.people.findIndex(x=>x.name===old);if(j>=0)Object.assign(P.people[j],v);else if(!P.people.some(x=>x.name===v.name))P.people.push(v)},`${old==null?'Add':'Edit'} person ${v.name}`)});
-$('#addPerson').onclick=()=>openPerson(null);
+$('#addPerson').onclick=()=>{if(!tok())return openSettings();if(!people)return alert('People list not loaded yet — tap ⟳');openPerson(null)};
 function setView(v){view=v;localStorage.setItem('view',v);const p=v==='people';$('#people').hidden=!p;$('#lists').hidden=p;$('#bar').hidden=p;
  $('#ttl').textContent=p?'People':'To-Dos';$('#tabBtn').textContent=p?'☑':'👥';if(p)loadPeople()}
 $('#tabBtn').onclick=()=>setView(view==='people'?'todos':'people');
