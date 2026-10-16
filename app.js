@@ -6,7 +6,7 @@ const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,''))
 const b64e=s=>{const b=new TextEncoder().encode(s);let r='';b.forEach(x=>r+=String.fromCharCode(x));return btoa(r)};
 const now=()=>new Date().toISOString();const status=m=>$('#status').textContent=m||'';
 function norm(d){d=d||{};d.schemaVersion=d.schemaVersion||1;d.todos=(d.todos||[]).map(t=>({steps:[],status:'open',list:'Inbox',...t}));
- const s=new Set(d.lists||['Inbox']);d.todos.forEach(t=>s.add(t.list));d.lists=[...s];d.favorites=(d.favorites||[]).filter(x=>d.lists.includes(x));if(d.schemaVersion<2)d.schemaVersion=2;return d}
+ const s=new Set(d.lists||['Inbox']);d.todos.forEach(t=>s.add(t.list));d.lists=[...s];d.favorites=(d.favorites||[]).filter(x=>d.lists.includes(x));if(d.schemaVersion<3)d.schemaVersion=3;return d}
 function sorted(d){const f=d.favorites,r=d.lists.filter(x=>!f.includes(x)).sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));return [...f,...r]}
 async function fetchData(){
  const r=await fetch(API+'?ref='+BRANCH+'&t='+Date.now(),{headers:{Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'},cache:'no-store'});
@@ -26,7 +26,7 @@ async function commit(change,msg){if(!navigator.onLine){alert('Offline — chang
   if(r.status===409||r.status===422){status('Conflict — retrying');await fetchData();continue}
   status('Save failed: HTTP '+r.status);return}status('Save failed after retries');await load()}
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-function render(){const m=$('#lists');m.innerHTML='';if(!data)return;
+var render=function(){const m=$('#lists');m.innerHTML='';if(!data)return;
  const f=$('#filter').value.trim().toLowerCase(),showDone=$('#showDone').checked;
  const as=new Set(data.todos.map(t=>t.assignee).filter(Boolean));$('#assignees').innerHTML=[...as].map(a=>`<option value="${esc(a)}">`).join('');
  $('#listNames').innerHTML=sorted(data).map(a=>`<option value="${esc(a)}">`).join('');
@@ -36,14 +36,14 @@ function render(){const m=$('#lists');m.innerHTML='';if(!data)return;
   if(!items.length){const e=document.createElement('p');e.className='empty';e.textContent='No items';s.appendChild(e)}
   for(const t of items){const d=document.createElement('div');d.className='item'+(t.status==='complete'?' done':'');
    d.innerHTML=`<button class="chk">${t.status==='complete'?'✓':''}</button><div class="body"><div class="t">${esc(t.title)}</div>
-   <div class="meta">${t.assignee?'👤 '+esc(t.assignee):''}</div>${t.steps&&t.steps.length?'<ul>'+t.steps.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}</div><button class="ed">✎</button>`;
+   <div class="meta">${t.assignee?'👤 '+esc(t.assignee)+' ':''}${t.due?`<span class="due${t.status!=='complete'&&dueAt(t)<Date.now()?' late':''}">📅 ${esc(fmtDue(t))}</span>`:''}</div>${t.steps&&t.steps.length?'<ul>'+t.steps.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}</div><button class="ed">✎</button>`;
    d.querySelector('.chk').onclick=()=>commit(D=>{const x=D.todos.find(y=>y.id===t.id);if(x){x.status=x.status==='complete'?'open':'complete';x.updated=now()}},`Toggle ${t.title}`);
    d.querySelector('.ed').onclick=()=>openEdit(t);s.appendChild(d)}m.appendChild(s)}
  if(!any)m.innerHTML='<p style="padding:14px;color:#666">Nothing to show.</p>'}
-function openEdit(t){editing=t.id;const F=$('#editForm');F.title.value=t.title;F.list.value=t.list;F.assignee.value=t.assignee||'';F.steps.value=(t.steps||[]).join('\n');F.status.value=t.status;$('#edit').showModal()}
+function openEdit(t){editing=t.id;const F=$('#editForm');F.title.value=t.title;F.list.value=t.list;F.assignee.value=t.assignee||'';F.steps.value=(t.steps||[]).join('\n');F.status.value=t.status;F.due.value=t.due||'';F.dueTime.value=t.due?(t.dueTime||''):'';F.dueTime.disabled=!t.due;$('#edit').showModal()}
 $('#edit').addEventListener('close',()=>{if($('#edit').returnValue!=='save')return;const F=$('#editForm'),id=editing;
- const v={title:F.title.value.trim(),list:F.list.value.trim()||'Inbox',assignee:F.assignee.value.trim(),steps:F.steps.value.split('\n').map(s=>s.trim()).filter(Boolean),status:F.status.value};
- commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x)return;Object.assign(x,v,{updated:now()});if(!x.assignee)delete x.assignee;if(!D.lists.includes(v.list))D.lists.push(v.list)},`Edit ${v.title}`)});
+ const v={title:F.title.value.trim(),list:F.list.value.trim()||'Inbox',assignee:F.assignee.value.trim(),steps:F.steps.value.split('\n').map(s=>s.trim()).filter(Boolean),status:F.status.value,due:F.due.value||'',dueTime:F.due.value?(F.dueTime.value||''):''};
+ commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x)return;const oldDue=x.due,oldTime=x.dueTime;Object.assign(x,v,{updated:now()});if(!x.assignee)delete x.assignee;if(!x.due)delete x.due;if(!x.dueTime||!x.due)delete x.dueTime;if(x.due!==oldDue||x.dueTime!==oldTime)unmark(x.id);if(!D.lists.includes(v.list))D.lists.push(v.list)},`Edit ${v.title}`)});
 function openSettings(){$('#setForm').token.value='';$('#settings').showModal()}
 $('#settings').addEventListener('close',()=>{const v=$('#settings').returnValue;
  if(v==='save'){const t=$('#setForm').token.value.trim();if(t){localStorage.setItem('gh_token',t);load()}}
@@ -79,3 +79,25 @@ function setView(v){view=v;localStorage.setItem('view',v);const p=v==='people';$
 $('#tabBtn').onclick=()=>setView(view==='people'?'todos':'people');
 const _load=load;$('#refresh').onclick=()=>view==='people'?loadPeople():_load();
 setView(view);loadPeople();
+
+// ---- Due dates & reminders ----
+function dueAt(t){if(!t.due)return Infinity;const [y,m,d]=t.due.split('-').map(Number);const [hh,mm]=(t.dueTime||'23:59').split(':').map(Number);return new Date(y,m-1,d,hh,mm).getTime()}
+function fmtDue(t){const d=new Date(dueAt(t));let s=d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});if(t.dueTime)s+=' '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});return s}
+const notified=()=>JSON.parse(localStorage.getItem('notified')||'{}');
+function unmark(id){const n=notified();delete n[id];localStorage.setItem('notified',JSON.stringify(n))}
+async function checkDue(){if(!data||!('Notification' in window)||Notification.permission!=='granted')return;const n=notified(),now=Date.now();let reg=null;
+ try{reg=await navigator.serviceWorker.ready}catch(e){}
+ for(const t of data.todos){if(t.status==='complete'||!t.due||!t.dueTime)continue;const at=dueAt(t),key=t.due+'T'+(t.dueTime||'');
+  if(at<=now&&n[t.id]!==key){n[t.id]=key;const o={body:'List: '+t.list,tag:'todo-'+t.id,icon:'icon-192.png'};
+   if(reg)reg.showNotification(t.title,o);else new Notification(t.title,o)}
+  else if(at>now&&reg&&'showTrigger' in Notification.prototype&&'TimestampTrigger' in window&&n['trig_'+t.id]!==key){ // bonus: Notification Triggers
+   try{reg.showNotification(t.title,{body:'List: '+t.list,tag:'todo-'+t.id,icon:'icon-192.png',showTrigger:new TimestampTrigger(at)});n['trig_'+t.id]=key;n[t.id]=key}catch(e){}}}
+ localStorage.setItem('notified',JSON.stringify(n))}
+function notifUI(){const b=$('#notif');if(!('Notification' in window)){b.hidden=false;$('#notifMsg').textContent='Reminders not supported here. On iPhone, open from the Home Screen icon (iOS 16.4+).';$('#notifBtn').hidden=true;return}
+ const p=Notification.permission;b.hidden=p==='granted';$('#notifBtn').hidden=p==='denied';
+ $('#notifMsg').textContent=p==='denied'?'Reminders are blocked. Turn on notifications for this app in your phone Settings (iPhone: Settings › Notifications › To-Dos; Android: long-press icon › App info › Notifications).':'Get a reminder when a to-do is due.'}
+$('#notifBtn').onclick=async()=>{await Notification.requestPermission();notifUI();checkDue()};
+setInterval(()=>{checkDue();},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){checkDue();render()}});
+const _render=render;render=function(){_render();checkDue()};notifUI();
+navigator.serviceWorker&&navigator.serviceWorker.ready.then(async r=>{try{if('periodicSync' in r&&(await navigator.permissions.query({name:'periodic-background-sync'})).state==='granted')await r.periodicSync.register('due-check',{minInterval:15*60*1000})}catch(e){}});
+$('#editForm').due.addEventListener('input',e=>{const T=$('#editForm').dueTime;T.disabled=!e.target.value;if(!e.target.value)T.value=''});
