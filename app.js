@@ -81,14 +81,14 @@ $('#pedit').addEventListener('close',()=>{if($('#pedit').returnValue!=='save')re
  const v={name:F.name.value.trim(),email:F.email.value.trim()||null,cell:F.cell.value.trim()||null};if(!v.name)return;
  commitPeople(P=>{const j=old==null?-1:P.people.findIndex(x=>x.name===old);if(j>=0)Object.assign(P.people[j],v);else if(!P.people.some(x=>x.name===v.name))P.people.push(v)},`${old==null?'Add':'Edit'} person ${v.name}`)});
 $('#addPerson').onclick=()=>{if(!tok())return openSettings();if(!people)return alert('People list not loaded yet — tap ⟳');openPerson(null)};
-const VIEWS={people:['#people','👥','People'],exercise:['#exercise','🏃','Exercise'],meals:['#meals','🍽','Meals'],glucose:['#glucose','🩸','Glucose'],weight:['#weight','⚖️','Weight']};
-const BTN={people:'#tabBtn',exercise:'#exBtn',meals:'#mlBtn',glucose:'#glBtn',weight:'#wtBtn'};
+const VIEWS={people:['#people','👥','People'],exercise:['#exercise','🏃','Exercise'],meals:['#meals','🍽','Meals'],glucose:['#glucose','🩸','Glucose'],weight:['#weight','⚖️','Weight'],goals:['#goals','🎯','Goals']};
+const BTN={people:'#tabBtn',exercise:'#exBtn',meals:'#mlBtn',glucose:'#glBtn',weight:'#wtBtn',goals:'#goBtn'};
 function setView(v){if(v!=='todos'&&!VIEWS[v])v='todos';view=v;localStorage.setItem('view',v);
  for(const k in VIEWS){$(VIEWS[k][0]).hidden=k!==v;$(BTN[k]).textContent=k===v?'☑':VIEWS[k][1]}
  $('#lists').hidden=v!=='todos';$('#bar').hidden=v!=='todos';$('#ttl').textContent=v==='todos'?'To-Dos':VIEWS[v][2];
- if(v==='people')loadPeople();if(v==='exercise')loadEx();if(v==='meals')loadMl();if(v==='glucose')loadGl();if(v==='weight')loadWt()}
+ if(v==='people')loadPeople();if(v==='exercise')loadEx();if(v==='meals')loadMl();if(v==='glucose')loadGl();if(v==='weight')loadWt();if(v==='goals')loadGo()}
 for(const k in BTN)$(BTN[k]).onclick=()=>setView(view===k?'todos':k);
-$('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():view==='meals'?loadMl():view==='glucose'?loadGl():view==='weight'?loadWt():load();
+$('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():view==='meals'?loadMl():view==='glucose'?loadGl():view==='weight'?loadWt():view==='goals'?loadGo():load();
 
 
 // ---- Due dates & reminders ----
@@ -338,7 +338,6 @@ function renderWt(){const conn=+localStorage.getItem('wConnecting')||0,b=$('#wtB
  $('#wtComp').innerHTML=rows.length?'<section><h2>Body composition</h2>'+rows.map(([k,l,f])=>`<div class="item"><div class="body"><div class="t">${l}</div></div><div>${f(last(k))}</div></div>`).join('')+'</section>':''}
 document.querySelectorAll('#wtSeg button').forEach(b=>b.onclick=()=>{wtRange=b.dataset.r;localStorage.setItem('wtRange',wtRange);renderWt()});
 withingsCallback();
-setView(view);loadPeople();
 
 // ---- Recurring to-dos ----
 const newId=()=>Math.random().toString(16).slice(2,10);
@@ -366,3 +365,84 @@ function catchUpItem(id){const nid=newId();if($('#edit').open)$('#edit').close('
  commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x||!isOverdueRec(x))return;const c=catchUpCalc(x.recurrence,x.due);
   x.status='complete';x.updated=now();x.skippedCount=c.skipped;spawnNext(D,x,nid);const n=D.todos.find(y=>y.id===nid);if(n)n.due=c.next},'Bring up to date');}
 $('#catchBtn').onclick=()=>catchUpItem(editing);
+
+// ---- Goals ----
+const GOAPI=RAW('goals.json');let go=null,gosha=null,goX={ex:[],wt:null,gl:null},showReview=new Date().getDay()===0;
+function gomsg(m){$('#goHead').innerHTML=`<p class="empty">${esc(m)}</p>`;$('#goCards').innerHTML=''}
+function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2500)}
+async function fetchGo(){const r=await fetch(GOAPI+'?ref='+BRANCH+'&t='+Date.now(),{headers:H(),cache:'no-store'});if(r.status===404){go=null;return}
+ if(r.status===401||r.status===403)throw new Error('auth');if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();gosha=j.sha;go=JSON.parse(b64d(j.content));
+ go.sessions=go.sessions||[];go.drift=go.drift||[];go.settings=go.settings||{};localStorage.setItem('gocache',JSON.stringify(go))}
+async function loadGo(){if(!tok()){gomsg('Add your GitHub key in ⚙ to load goals.');return}if(!go)gomsg('Loading goals…');
+ try{await fetchGo();if(!go){gomsg('No goals.json yet.');return}}
+ catch(e){const c=localStorage.getItem('gocache');if(c){go=JSON.parse(c);status('Offline/error — showing saved goals ('+e.message+')')}
+  else{gomsg(e.message==='auth'?'GitHub key was rejected. Update it in ⚙.':'Could not load goals: '+e.message+'. Tap ⟳ to retry.');return}}
+ renderGo();// indicators (best effort, non-blocking)
+ const [ex,wt,gl]=await Promise.all([ghRaw('exercise.json').catch(()=>null),ghRaw('weight-history.json').catch(()=>null),ghRaw('glucose.json').catch(()=>null)]);
+ goX={ex:(ex&&ex.entries)||[],wt,gl};renderGo()}
+async function commitGo(change,msg){if(!navigator.onLine){alert('Offline — changes need a connection');return false}
+ for(let i=0;i<3;i++){change(go);go.updated=now();renderGo();const body={message:msg,content:b64e(JSON.stringify(go,null,2)+'\n'),branch:BRANCH};if(gosha)body.sha=gosha;
+  const r=await fetch(GOAPI,{method:'PUT',headers:H(),body:JSON.stringify(body)});
+  if(r.ok){gosha=(await r.json()).content.sha;localStorage.setItem('gocache',JSON.stringify(go));return true}
+  if(r.status===409||r.status===422){await fetchGo();continue}status('Save failed: HTTP '+r.status);return false}status('Save failed after retries');return false}
+const curQ=()=>(go.quarters||[]).find(q=>q.status==='current');
+function ring(p,label){const r=22,c=2*Math.PI*r,v=Math.max(0,Math.min(1,p||0));return `<svg width="56" height="56" viewBox="0 0 56 56" class="ring"><circle cx="28" cy="28" r="${r}" fill="none" stroke="#e5e7eb" stroke-width="6"/><circle cx="28" cy="28" r="${r}" fill="none" stroke="${v>=1?'#10b981':'#2563eb'}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(c*v).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 28 28)"/><text x="28" y="32" text-anchor="middle" font-size="12" font-weight="700">${esc(label)}</text></svg>`}
+function heat(valByDay,max){const end=new Date();end.setHours(0,0,0,0);const s=GC.weekStart(end);s.setDate(s.getDate()-28);let h='<div class="heat">';
+ for(let d=new Date(s),i=0;i<35;i++,d.setDate(d.getDate()+1)){const v=valByDay[GC.dayKey(d)]||0,f=d>end?-1:Math.min(1,v/(max||1));h+=`<i style="background:${f<0?'transparent':f===0?'#e5e7eb':`rgba(16,185,129,${0.3+0.7*f})`}" title="${GC.dayKey(d)}"></i>`}return h+'</div>'}
+const LBS=2.20462;
+function goalView(g){const nowD=new Date(),[s,e]=GC.periodBounds(g.period,nowD);
+ if(g.indicator==='weight-history.json'){const m=(curQ().metric)||{start:225,target:200};const rs=((goX.wt&&goX.wt.readings)||[]).filter(r=>r.weightKg!=null);
+  const by={};rs.forEach(r=>by[GC.dayKey(r.t)]=1);if(!rs.length)return {ring:ring(0,'—'),line:'No weigh-ins yet',heat:heat(by,1)};
+  const lb=rs.at(-1).weightKg*LBS,lost=m.start-lb,need=m.start-m.target,p=GC.pace(lost,need,s,e,nowD);
+  return {ring:ring(lost/need,Math.round(lb)+''),line:`${lb.toFixed(1)} lb → ${m.target}. `+(lost>=need?'Target reached ✓':p.onPace?`${lost.toFixed(1)} of ${need} lb, on pace`:`${(p.expected-lost).toFixed(1)} lb behind pace`),heat:heat(by,1)}}
+ if(g.indicator==='glucose.json'){const rs=(goX.gl&&goX.gl.readings)||[];const by={},cnt={};
+  for(const r of rs){const k=GC.dayKey(r.t),v=r.mmol??r.mgdl/18.0182;cnt[k]=(cnt[k]||0)+1;by[k]=(by[k]||0)+(v>=3.9&&v<=10?1:0)}for(const k in by)by[k]/=cnt[k];
+  const wk=rs.filter(r=>Date.parse(r.t)>=Date.now()-7*864e5);if(!wk.length)return {ring:ring(0,'—'),line:'No readings yet',heat:heat(by,1)};
+  const mm=x=>x.mmol??x.mgdl/18.0182,avg=wk.reduce((t,x)=>t+mm(x),0)/wk.length,tir=wk.filter(x=>mm(x)>=3.9&&mm(x)<=10).length/wk.length,tgt=(g.targetTIR||70)/100;
+  return {ring:ring(tir/tgt,Math.round(tir*100)+'%'),line:`7-day avg ${avg.toFixed(1)} mmol/L, ${Math.round(tir*100)}% in range`+(tir>=tgt?' — on target ✓':` (target ${Math.round(tgt*100)}%)`),heat:heat(by,1)}}
+ const by=GC.minutesByDay(g.id,go.sessions,goX.ex),t=g.targetMinutes||0,done=GC.sumRange(by,s,e);
+ if(!t)return {ring:ring(0,done+''),line:`${done} min this ${g.period}. Set a target ✎`,heat:heat(by,30),minutes:true};
+ const p=GC.pace(done,t,s,e,nowD),ws=GC.weekStreak(by,t,nowD);
+ return {ring:ring(done/t,Math.round(done/t*100)+'%'),line:GC.paceLine(done,t,p)+(ws?` · ${ws} wk on target`:''),heat:heat(by,t/7),minutes:true}}
+function renderGo(){if(!go)return;const q=curQ();if(!q){gomsg('No current quarter in goals.json.');return}
+ const all={};for(const s of go.sessions)all[GC.dayKey(s.at)]=1;for(const x of goX.ex)all[GC.dayKey(x.at)]=1;const st=GC.dayStreak(all,new Date());
+ $('#goHead').innerHTML=`<div class="one">🎯 ${esc(q.theOneThing)}</div><div class="meta">${esc(q.why||'')}${st?` · 🔥 ${st}-day streak`:''}</div>`;
+ const tm=localStorage.getItem('goTimers')?JSON.parse(localStorage.getItem('goTimers')):{};
+ $('#goCards').innerHTML=(q.goals||[]).map(g=>{const v=goalView(g),running=tm[g.id];
+  return `<div class="gcard" data-g="${esc(g.id)}"><div class="grow">${v.ring}<div class="body"><div class="t">${esc(g.name)} <small class="meta">· ${esc(g.period)}${g.targetMinutes?` · ${g.targetMinutes} min`:''}</small></div><div class="meta">${esc(v.line)}</div></div>${v.minutes?'<button class="ed gtgt" title="Target">✎</button>':''}</div>
+  ${v.minutes?`<div class="chips"><button class="chip" data-m="15">15</button><button class="chip" data-m="30">30</button><button class="chip" data-m="60">60</button><button class="chip tmr${running?' on':''}">${running?'■ Stop':'▶ Start'}</button></div>`:''}${v.heat}</div>`}).join('');
+ $('#goCards').querySelectorAll('.gcard').forEach(c=>{const id=c.dataset.g;c.querySelectorAll('.chip[data-m]').forEach(b=>b.onclick=()=>logSession(id,+b.dataset.m));
+  const t=c.querySelector('.tmr');if(t)t.onclick=()=>toggleTimer(id);const e=c.querySelector('.gtgt');if(e)e.onclick=()=>editTarget(id)});
+ $('#nudgeTime').value=go.settings.nudgeTime||'';renderReview()}
+function weekPct(id){const g=curQ().goals.find(x=>x.id===id);if(!g||!g.targetMinutes)return null;const [s,e]=GC.periodBounds(g.period,new Date());return Math.round(GC.sumRange(GC.minutesByDay(id,go.sessions,goX.ex),s,e)/g.targetMinutes*100)}
+async function logSession(goalId,minutes,note){if(!tok())return openSettings();if(!go||!minutes)return;const s={id:newId(),at:now(),minutes,goalId};if(note)s.note=note;
+ const g=curQ().goals.find(x=>x.id===goalId);const ok=await commitGo(D=>{if(!D.sessions.some(x=>x.id===s.id))D.sessions.push(s)},`Log ${minutes} min ${goalId}`);
+ if(ok){const p=weekPct(goalId);toast(p!=null?`Nice — ${p}% of the ${g.period}`:`Logged ${minutes} min ✓`)}}
+function toggleTimer(id){const tm=JSON.parse(localStorage.getItem('goTimers')||'{}');
+ if(tm[id]){const m=Math.max(1,Math.round((Date.now()-tm[id])/60000));delete tm[id];localStorage.setItem('goTimers',JSON.stringify(tm));logSession(id,m,'timer')}
+ else{tm[id]=Date.now();localStorage.setItem('goTimers',JSON.stringify(tm));renderGo();toast('Timer started')}}
+function editTarget(id){const g=curQ().goals.find(x=>x.id===id);const v=prompt(`Target minutes per ${g.period} for ${g.name}`,g.targetMinutes||'');if(v===null)return;const n=Math.max(0,parseInt(v)||0);
+ commitGo(D=>{const x=D.quarters.find(q=>q.status==='current').goals.find(y=>y.id===id);if(n)x.targetMinutes=n;else delete x.targetMinutes},`Target ${id} ${n}`)}
+$('#goLog').onsubmit=ev=>{ev.preventDefault();if(!go)return;const F=$('#goLog'),r=GC.parsePhrase(F.q.value,curQ().goals.filter(g=>!g.indicator||g.indicator==='sessions'||g.indicator==='exercise.json'));
+ if(!r.minutes){toast('How many minutes? e.g. “30 min walk”');return}if(!r.goal){toast('Which goal? Try a goal name, or tap a card chip');return}
+ const note=F.q.value.trim();F.q.value='';logSession(r.goal.id,r.minutes,note)};
+// Drift
+$('#driftBtn').onclick=()=>{if(!tok())return openSettings();const F=$('#driftForm');F.minutes.value='';F.reason.value='other';document.querySelectorAll('#driftWhy .chip').forEach(c=>c.classList.toggle('on',c.dataset.r==='other'));$('#driftDlg').showModal()};
+document.querySelectorAll('#driftMin .chip').forEach(b=>b.onclick=()=>$('#driftForm').minutes.value=b.dataset.m);
+document.querySelectorAll('#driftWhy .chip').forEach(b=>b.onclick=()=>{$('#driftForm').reason.value=b.dataset.r;document.querySelectorAll('#driftWhy .chip').forEach(c=>c.classList.toggle('on',c===b))});
+$('#driftDlg').addEventListener('close',async()=>{if($('#driftDlg').returnValue!=='save')return;const F=$('#driftForm'),d={id:newId(),at:now(),minutes:+F.minutes.value,reason:F.reason.value};if(!d.minutes)return;
+ if(await commitGo(D=>{if(!D.drift.some(x=>x.id===d.id))D.drift.push(d)},'Log drift'))toast('Noticed ✓')});
+// Weekly review
+$('#reviewBtn').onclick=()=>{showReview=!showReview;renderReview()};
+function renderReview(){const el=$('#goReview');if(!showReview||!go){el.innerHTML='';return}const [s,e]=GC.periodBounds('week',new Date()),inW=x=>{const t=Date.parse(x.at);return t>=+s&&t<+e};
+ const q=curQ(),gm=q.goals.filter(g=>g.targetMinutes).map(g=>({g,done:GC.sumRange(GC.minutesByDay(g.id,go.sessions,goX.ex),s,e)}));const goalMin=gm.reduce((t,x)=>t+x.done,0);
+ const dr=go.drift.filter(inW),drMin=dr.reduce((t,x)=>t+(+x.minutes||0),0),why={};dr.forEach(x=>why[x.reason]=(why[x.reason]||0)+(+x.minutes||0));
+ const top=Object.entries(why).sort((a,b)=>b[1]-a[1]).slice(0,3);
+ el.innerHTML=`<section class="gcard"><div class="t">Weekly review</div><div class="meta">Goal time ${goalMin} min · Drift ${drMin} min</div>`+
+  (top.length?`<div class="meta">Top drift: ${top.map(([r,m])=>`${esc(r)} ${m} min`).join(', ')}</div>`:'<div class="meta">No drift noticed this week.</div>')+
+  gm.map(({g,done})=>`<div class="row rv"><span>${esc(g.name)}: ${done}/${g.targetMinutes} min</span><input type="number" min="0" value="${g.targetMinutes}" data-g="${esc(g.id)}"></div>`).join('')+
+  `<button type="button" id="rvSave">Save targets</button></section>`;
+ $('#rvSave').onclick=()=>{const vals={};el.querySelectorAll('input[data-g]').forEach(i=>vals[i.dataset.g]=Math.max(0,parseInt(i.value)||0));
+  commitGo(D=>{for(const g of D.quarters.find(q=>q.status==='current').goals)if(g.id in vals){if(vals[g.id])g.targetMinutes=vals[g.id];else delete g.targetMinutes}},'Weekly review: targets').then(ok=>ok&&toast('Targets saved ✓'))}}
+$('#nudgeSave').onclick=()=>{const v=$('#nudgeTime').value||null;commitGo(D=>{D.settings=D.settings||{};D.settings.nudgeTime=v},'Nudge time').then(ok=>ok&&toast(v?`Nudge at ${v} (only if behind)`:'Nudge off'))};
+setView(view);loadPeople();

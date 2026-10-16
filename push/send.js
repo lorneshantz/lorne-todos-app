@@ -16,4 +16,16 @@ function nyToUtc(date,time){const [y,m,d]=date.split('-').map(Number),[hh,mm]=ti
    catch(e){if(e.statusCode===404||e.statusCode===410)dead.add(s.endpoint);else console.log('push error',e.statusCode||e.message)}}
   if(ok)pushed[key]=new Date().toISOString();console.log('sent',t.id,ok)}
  if(dead.size){subsF.subscriptions=subs.filter(s=>!dead.has(s.endpoint));wr('subscriptions.json',subsF);console.log('dropped',dead.size)}
+ try{await goalsNudge(subs.filter(s=>!dead.has(s.endpoint)),pushed)}catch(e){console.log('nudge error',e.message)}
  wr('pushed.json',pushed)})().catch(e=>{console.error(e);process.exit(1)});
+
+// Daily goals nudge: at most one per day, only if a goal is behind pace (America/New_York).
+async function goalsNudge(subs,pushed){const g=rd('goals.json',null);const t=g&&g.settings&&g.settings.nudgeTime;if(!t)return;
+ process.env.TZ='America/New_York';const GC=require('../goals-core.js');const now=new Date();
+ const today=GC.dayKey(now),hm=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,key='nudge|'+today;
+ if(hm<t||pushed[key])return;const behind=GC.behindGoals(g,(rd('exercise.json',{}).entries)||[],now);
+ if(!behind.length){pushed[key]='on-pace';console.log('nudge: all on pace');return}
+ if(!subs.length){console.log('nudge: no subscriptions');return}
+ const body=behind.map(b=>`${b.goal.name}: ${b.p.behind} min behind, ~${b.p.perDay} min/day`).join(' · ');let ok=0;
+ for(const s of subs){try{await webpush.sendNotification(s,JSON.stringify({title:'Goals check-in',body,tag:'goals-nudge'}));ok++}catch(e){console.log('nudge push error',e.statusCode||e.message)}}
+ if(ok)pushed[key]=new Date().toISOString();console.log('nudge sent',behind.length,ok)}

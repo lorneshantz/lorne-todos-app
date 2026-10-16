@@ -3,8 +3,8 @@
 <meta name="theme-color" content="#1f2937"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Lorne To-Dos</title><link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css?v=16"></head>
-<body><header><h1 id="ttl">To-Dos</h1><button id="tabBtn" title="People">👥</button><button id="exBtn" title="Exercise">🏃</button><button id="mlBtn" title="Meals">🍽</button><button id="glBtn" title="Glucose">🩸</button><button id="wtBtn" title="Weight">⚖️</button><button id="refresh" title="Refresh">⟳</button><button id="settingsBtn" title="Settings">⚙</button></header>
+<link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css?v=17"></head>
+<body><header><h1 id="ttl">To-Dos</h1><button id="tabBtn" title="People">👥</button><button id="exBtn" title="Exercise">🏃</button><button id="mlBtn" title="Meals">🍽</button><button id="glBtn" title="Glucose">🩸</button><button id="wtBtn" title="Weight">⚖️</button><button id="goBtn" title="Goals">🎯</button><button id="refresh" title="Refresh">⟳</button><button id="settingsBtn" title="Settings">⚙</button></header>
 <div id="bar"><input id="filter" placeholder="Filter by assignee" list="assignees"><datalist id="assignees"></datalist>
 <label><input type="checkbox" id="showDone"> Show completed</label></div>
 <div id="notif" hidden><span id="notifMsg"></span> <button id="notifBtn">Enable reminders</button> <button class="pushBtn">Turn on push</button> <span class="pushState"></span></div><div id="status"></div><main id="lists"></main>
@@ -29,6 +29,18 @@
 <div class="seg" id="wtSeg"><button data-r="day">Today</button><button data-r="week">Week</button><button data-r="month">Month</button></div>
 <div id="wtChart"></div><div id="wtInfo" class="meta"></div><div id="wtComp"></div>
 <p><button type="button" class="wConnect add">Connect Withings</button></p><p class="note">Syncs from Withings about every 15 min.</p></main>
+<main id="goals" hidden><div id="goHead" class="gohead"></div>
+<form id="goLog" class="exadd"><input name="q" placeholder="e.g. just walked 45 minutes" style="flex:1"><button>Log</button></form>
+<div id="goCards"></div>
+<div class="gobar"><button type="button" id="driftBtn" class="add">Drift…</button><button type="button" id="reviewBtn" class="add">Weekly review</button></div>
+<div id="goReview"></div>
+<p class="note">Daily nudge (only if behind pace): <input type="time" id="nudgeTime"> <button type="button" id="nudgeSave">Save</button></p></main>
+<dialog id="driftDlg"><form method="dialog" id="driftForm"><h2>Drift</h2><p class="meta">Time that didn't go to a goal. Just noticing.</p>
+<div class="chips" id="driftMin"><button type="button" class="chip" data-m="15">15</button><button type="button" class="chip" data-m="30">30</button><button type="button" class="chip" data-m="60">60</button></div>
+<label>Minutes<input name="minutes" type="number" min="1" required></label>
+<div class="chips" id="driftWhy"><button type="button" class="chip" data-r="scrolling">scrolling</button><button type="button" class="chip" data-r="rabbit hole">rabbit hole</button><button type="button" class="chip" data-r="pointless meeting">pointless meeting</button><button type="button" class="chip" data-r="other">other</button></div>
+<input type="hidden" name="reason" value="other"><menu><button value="cancel" formnovalidate>Cancel</button><button value="save">Save</button></menu></form></dialog>
+<div id="toast" hidden></div>
 <dialog id="pedit"><form method="dialog" id="pForm"><h2 id="pTitle">Person</h2>
 <label>Name<input name="name" required></label><label>Email<input name="email" type="email"></label>
 <label>Cell<input name="cell" type="tel"></label>
@@ -51,4 +63,4 @@
 <label>Token<input name="token" type="password" autocomplete="off"></label>
 <p><button type="button" class="pushBtn">Turn on push</button> <button type="button" class="pushReBtn">Re-register push</button><br><span class="pushState"></span><br><label>Withings client ID (only if asked)<input name="wcid" autocomplete="off"></label><button type="button" class="wConnect">Connect Withings</button><br><small>Push works with the app closed. iPhone: only from the Home Screen app, iOS 16.4+.</small></p>
 <menu><button value="signout" formnovalidate>Sign out</button><button value="cancel" formnovalidate>Cancel</button><button value="save">Save</button></menu></form></dialog>
-<script src="app.js?v=16"></script></body></html>
+<script src="goals-core.js?v=17"></script><script src="app.js?v=17"></script></body></html>
