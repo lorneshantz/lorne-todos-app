@@ -23,3 +23,4 @@ menu button{padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:
 .chips{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 100%}.chip{padding:6px 12px;border-radius:16px;border:1px solid #ccc;background:#fff;font-size:14px}
 #weight{margin:10px 14px}.big.wt{color:#7c3aed}.big .u{font-size:22px;font-weight:600}.banner{background:#fef3c7;border-radius:10px;padding:10px;margin-bottom:10px;font-size:14px}.banner button{margin-left:6px;padding:6px 10px;border:0;border-radius:8px;background:#1f2937;color:#fff}
 #wtChart{background:#fff;border-radius:12px;padding:6px}
+.cu{background:none;border:0;font-size:18px}

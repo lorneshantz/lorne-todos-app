@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Complete a to-do (same rules as the app, incl. recurring spawn).
-Usage: complete.py <todos.json> [more copies...] --id ID | --title "substring"   [--reopen]
+Usage: complete.py <todos.json> [more copies...] --id ID | --title "substring"   [--reopen | --catch-up]
+--catch-up: overdue recurring item -> complete with skippedCount, one new copy due on first occurrence >= today.
 Edits each file in place (e.g. the store copy and the repo clone); commit/push the repo yourself.
 Recurring: marks complete, creates one new open copy with the next due date; never spawns twice (spawnedNext)."""
 import json, sys, argparse, secrets, calendar, datetime as dt
@@ -30,9 +31,15 @@ def complete(d, x, nid):
     if x.get('assignee'): c['assignee'] = x['assignee']
     if x.get('dueTime'): c['dueTime'] = x['dueTime']
     d['todos'].append(c); x['spawnedNext'] = nid; return c
+def catch_up(d, x, nid):
+    today = dt.datetime.now(NY).date().isoformat(); rc = x.get('recurrence')
+    if not rc or not x.get('due') or x['due'] >= today or x.get('spawnedNext'): sys.exit('not an overdue recurring item (or already spawned)')
+    nd, skipped = x['due'], 0
+    while nd < today: skipped += 1; nd = next_due(rc, nd)
+    c = complete(d, x, nid); x['skippedCount'] = skipped; c['due'] = nd; return c
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('files', nargs='+'); g = ap.add_mutually_exclusive_group(required=True)
-    g.add_argument('--id'); g.add_argument('--title'); ap.add_argument('--reopen', action='store_true'); a = ap.parse_args()
+    g.add_argument('--id'); g.add_argument('--title'); ap.add_argument('--reopen', action='store_true'); ap.add_argument('--catch-up', action='store_true'); a = ap.parse_args()
     nid = secrets.token_hex(4)
     for f in a.files:
         d = json.load(open(f))
@@ -40,6 +47,7 @@ def main():
         if len(m) != 1: sys.exit(f"{f}: expected 1 match, found {len(m)}: {[t['title'] for t in m]}")
         x = m[0]
         if a.reopen: x['status'] = 'open'; x['updated'] = now(); new = None
+        elif a.catch_up: new = catch_up(d, x, nid)
         else: new = complete(d, x, nid)
         d['schemaVersion'] = max(4, d.get('schemaVersion', 1)); d['updated'] = now()
         open(f, 'w').write(json.dumps(d, indent=2) + '\n')

@@ -3,7 +3,7 @@
 <meta name="theme-color" content="#1f2937"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Lorne To-Dos</title><link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css?v=15"></head>
+<link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css?v=16"></head>
 <body><header><h1 id="ttl">To-Dos</h1><button id="tabBtn" title="People">👥</button><button id="exBtn" title="Exercise">🏃</button><button id="mlBtn" title="Meals">🍽</button><button id="glBtn" title="Glucose">🩸</button><button id="wtBtn" title="Weight">⚖️</button><button id="refresh" title="Refresh">⟳</button><button id="settingsBtn" title="Settings">⚙</button></header>
 <div id="bar"><input id="filter" placeholder="Filter by assignee" list="assignees"><datalist id="assignees"></datalist>
 <label><input type="checkbox" id="showDone"> Show completed</label></div>
@@ -43,6 +43,7 @@
 <label>Every<input name="rint" type="number" min="1" value="1"></label></div>
 <label id="rwdL">On<select name="rwd"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></label>
 <label id="rmdL">Day of month<input name="rmd" type="number" min="1" max="31"></label>
+<p id="catchL" hidden><button type="button" id="catchBtn">⏭ Bring up to date</button> <small id="catchInfo"></small></p>
 <label>Status<select name="status"><option>open</option><option>complete</option></select></label>
 <menu><button value="cancel" formnovalidate>Cancel</button><button value="save" id="saveBtn">Save</button></menu></form></dialog>
 <dialog id="settings"><form method="dialog" id="setForm"><h2>GitHub access</h2>
@@ -50,4 +51,4 @@
 <label>Token<input name="token" type="password" autocomplete="off"></label>
 <p><button type="button" class="pushBtn">Turn on push</button> <button type="button" class="pushReBtn">Re-register push</button><br><span class="pushState"></span><br><label>Withings client ID (only if asked)<input name="wcid" autocomplete="off"></label><button type="button" class="wConnect">Connect Withings</button><br><small>Push works with the app closed. iPhone: only from the Home Screen app, iOS 16.4+.</small></p>
 <menu><button value="signout" formnovalidate>Sign out</button><button value="cancel" formnovalidate>Cancel</button><button value="save">Save</button></menu></form></dialog>
-<script src="app.js?v=15"></script></body></html>
+<script src="app.js?v=16"></script></body></html>

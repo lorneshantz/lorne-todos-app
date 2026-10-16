@@ -36,11 +36,11 @@ var render=function(){const m=$('#lists');m.innerHTML='';if(!data)return;
   if(!items.length){const e=document.createElement('p');e.className='empty';e.textContent='No items';s.appendChild(e)}
   for(const t of items){const d=document.createElement('div');d.className='item'+(t.status==='complete'?' done':'');
    d.innerHTML=`<button class="chk">${t.status==='complete'?'✓':''}</button><div class="body"><div class="t">${t.recurrence?'<span title="Repeats">🔁</span> ':''}${esc(t.title)}</div>
-   <div class="meta">${t.assignee?'👤 '+esc(t.assignee)+' ':''}${t.due?`<span class="due${t.status!=='complete'&&dueAt(t)<Date.now()?' late':''}">📅 ${esc(fmtDue(t))}</span>`:''}</div>${t.steps&&t.steps.length?'<ul>'+t.steps.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}</div><button class="ed">✎</button>`;
+   <div class="meta">${t.assignee?'👤 '+esc(t.assignee)+' ':''}${t.due?`<span class="due${t.status!=='complete'&&dueAt(t)<Date.now()?' late':''}">📅 ${esc(fmtDue(t))}</span>`:''}</div>${t.steps&&t.steps.length?'<ul>'+t.steps.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}</div>${isOverdueRec(t)?'<button class="cu" title="Bring up to date">⏭</button>':''}<button class="ed">✎</button>`;
    d.querySelector('.chk').onclick=()=>{const nid=newId();commit(D=>{const x=D.todos.find(y=>y.id===t.id);if(x){x.status=x.status==='complete'?'open':'complete';x.updated=now();if(x.status==='complete')spawnNext(D,x,nid)}},`Toggle ${t.title}`)}
-   d.querySelector('.ed').onclick=()=>openEdit(t);s.appendChild(d)}m.appendChild(s)}
+   d.querySelector('.ed').onclick=()=>openEdit(t);{const cb=d.querySelector('.cu');if(cb)cb.onclick=()=>catchUpItem(t.id)}s.appendChild(d)}m.appendChild(s)}
  if(!any)m.innerHTML='<p style="padding:14px;color:#666">Nothing to show.</p>'}
-function openEdit(t){editing=t.id;const F=$('#editForm');F.title.value=t.title;F.list.value=t.list;F.assignee.value=t.assignee||'';F.steps.value=(t.steps||[]).join('\n');F.status.value=t.status;F.due.value=t.due||'';F.dueTime.value=t.due?(t.dueTime||''):'';F.dueTime.disabled=!t.due;const rc=t.recurrence||{};F.rtype.value=rc.type||'';F.rint.value=rc.interval||1;F.rwd.value=String(rc.weekday??(t.due?pd(t.due).getDay():new Date().getDay()));F.rmd.value=rc.monthDay||(t.due?pd(t.due).getDate():new Date().getDate());rUI();$('#edit').showModal()}
+function openEdit(t){editing=t.id;const F=$('#editForm');F.title.value=t.title;F.list.value=t.list;F.assignee.value=t.assignee||'';F.steps.value=(t.steps||[]).join('\n');F.status.value=t.status;F.due.value=t.due||'';F.dueTime.value=t.due?(t.dueTime||''):'';F.dueTime.disabled=!t.due;const rc=t.recurrence||{};F.rtype.value=rc.type||'';F.rint.value=rc.interval||1;F.rwd.value=String(rc.weekday??(t.due?pd(t.due).getDay():new Date().getDay()));F.rmd.value=rc.monthDay||(t.due?pd(t.due).getDate():new Date().getDate());rUI();{const od=isOverdueRec(t);$('#catchL').hidden=!od;if(od){const c=catchUpCalc(t.recurrence,t.due);$('#catchInfo').textContent=`missed ${c.skipped}, next ${c.next}`}}$('#edit').showModal()}
 $('#edit').addEventListener('close',()=>{if($('#edit').returnValue!=='save')return;const F=$('#editForm'),id=editing;
  const v={title:F.title.value.trim(),list:F.list.value.trim()||'Inbox',assignee:F.assignee.value.trim(),steps:F.steps.value.split('\n').map(s=>s.trim()).filter(Boolean),status:F.status.value,due:F.due.value||'',dueTime:F.due.value?(F.dueTime.value||''):''};const rec=readRec(F),nid=newId();
  commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x)return;const wasDone=x.status==='complete';if(rec)x.recurrence=rec;else delete x.recurrence;const oldDue=x.due,oldTime=x.dueTime;Object.assign(x,v,{updated:now()});if(!x.assignee)delete x.assignee;if(!x.due)delete x.due;if(!x.dueTime||!x.due)delete x.dueTime;if(x.due!==oldDue||x.dueTime!==oldTime)unmark(x.id);if(!D.lists.includes(v.list))D.lists.push(v.list);if(!wasDone&&x.status==='complete')spawnNext(D,x,nid)},`Edit ${v.title}`)});
@@ -357,3 +357,12 @@ function readRec(F){const t=F.rtype.value;if(!t)return null;const r={type:t,inte
  if(t==='weekly')r.weekday=+F.rwd.value;if(t==='monthly')r.monthDay=Math.min(31,Math.max(1,+F.rmd.value||1));return r}
 function rUI(){const F=$('#editForm'),t=F.rtype.value;$('#rwdL').hidden=t!=='weekly';$('#rmdL').hidden=t!=='monthly';F.rint.disabled=!t}
 $('#editForm').rtype.addEventListener('change',rUI);
+
+// ---- Bring up to date ----
+const todayStr=()=>fd(new Date());
+const isOverdueRec=t=>!!(t.recurrence&&t.status!=='complete'&&t.due&&t.due<todayStr()&&!t.spawnedNext);
+function catchUpCalc(rc,due){const td=todayStr();let d=due,skipped=0,guard=0;while(d<td&&guard++<5000){skipped++;d=nextDue(rc,d)}return {skipped,next:d}}
+function catchUpItem(id){const nid=newId();if($('#edit').open)$('#edit').close('cancel');
+ commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x||!isOverdueRec(x))return;const c=catchUpCalc(x.recurrence,x.due);
+  x.status='complete';x.updated=now();x.skippedCount=c.skipped;spawnNext(D,x,nid);const n=D.todos.find(y=>y.id===nid);if(n)n.due=c.next},'Bring up to date');}
+$('#catchBtn').onclick=()=>catchUpItem(editing);
