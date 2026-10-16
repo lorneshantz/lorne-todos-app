@@ -11,3 +11,4 @@ dialog{border:0;border-radius:12px;width:min(94vw,440px)}dialog label{display:bl
 dialog input,dialog textarea,dialog select{width:100%;font-size:16px;padding:8px;border:1px solid #ccc;border-radius:8px}menu{display:flex;gap:8px;justify-content:flex-end;padding:0}
 menu button{padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:#fff;font-size:15px}menu button[value=save]{background:#1f2937;color:#fff}
 .star{background:none;border:0;font-size:20px;color:#9ca3af;padding:0 4px 0 0;vertical-align:middle}.star.on{color:#f59e0b}.empty{color:#999;font-size:13px;margin:2px 4px 8px}
+#people{margin:10px 14px}.add{width:100%;padding:12px;font-size:16px;border-radius:10px;border:1px dashed #9ca3af;background:#fff;margin-bottom:10px}.meta a{color:#2563eb}

@@ -4,14 +4,19 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Lorne To-Dos</title><link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css"></head>
-<body><header><h1>To-Dos</h1><button id="refresh" title="Refresh">⟳</button><button id="settingsBtn" title="Settings">⚙</button></header>
+<body><header><h1 id="ttl">To-Dos</h1><button id="tabBtn" title="Switch view">👥</button><button id="refresh" title="Refresh">⟳</button><button id="settingsBtn" title="Settings">⚙</button></header>
 <div id="bar"><input id="filter" placeholder="Filter by assignee" list="assignees"><datalist id="assignees"></datalist>
 <label><input type="checkbox" id="showDone"> Show completed</label></div>
 <div id="status"></div><main id="lists"></main>
+<main id="people" hidden><button id="addPerson" class="add">+ Add person</button><div id="plist"></div></main>
+<dialog id="pedit"><form method="dialog" id="pForm"><h2 id="pTitle">Person</h2>
+<label>Name<input name="name" required></label><label>Email<input name="email" type="email"></label>
+<label>Cell<input name="cell" type="tel"></label>
+<menu><button value="cancel" formnovalidate>Cancel</button><button value="save">Save</button></menu></form></dialog>
 <dialog id="edit"><form method="dialog" id="editForm"><h2>Edit item</h2>
 <label>Title<input name="title" required></label>
 <label>List<input name="list" list="listNames" required></label><datalist id="listNames"></datalist>
-<label>Assignee<input name="assignee"></label>
+<label>Assignee<input name="assignee" list="peopleNames"></label><datalist id="peopleNames"></datalist>
 <label>Steps (one per line)<textarea name="steps" rows="5"></textarea></label>
 <label>Status<select name="status"><option>open</option><option>complete</option></select></label>
 <menu><button value="cancel" formnovalidate>Cancel</button><button value="save" id="saveBtn">Save</button></menu></form></dialog>
