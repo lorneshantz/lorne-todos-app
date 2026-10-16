@@ -81,12 +81,12 @@ $('#pedit').addEventListener('close',()=>{if($('#pedit').returnValue!=='save')re
  const v={name:F.name.value.trim(),email:F.email.value.trim()||null,cell:F.cell.value.trim()||null};if(!v.name)return;
  commitPeople(P=>{const j=old==null?-1:P.people.findIndex(x=>x.name===old);if(j>=0)Object.assign(P.people[j],v);else if(!P.people.some(x=>x.name===v.name))P.people.push(v)},`${old==null?'Add':'Edit'} person ${v.name}`)});
 $('#addPerson').onclick=()=>{if(!tok())return openSettings();if(!people)return alert('People list not loaded yet — tap ⟳');openPerson(null)};
-function setView(v){view=v;localStorage.setItem('view',v);const p=v==='people',x=v==='exercise';
- $('#people').hidden=!p;$('#exercise').hidden=!x;$('#lists').hidden=p||x;$('#bar').hidden=p||x;
- $('#ttl').textContent=p?'People':x?'Exercise':'To-Dos';$('#tabBtn').textContent=p?'☑':'👥';$('#exBtn').textContent=x?'☑':'🏃';
- if(p)loadPeople();if(x)loadEx()}
-$('#tabBtn').onclick=()=>setView(view==='people'?'todos':'people');$('#exBtn').onclick=()=>setView(view==='exercise'?'todos':'exercise');
-$('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():load();
+function setView(v){view=v;localStorage.setItem('view',v);const p=v==='people',x=v==='exercise',m=v==='meals';
+ $('#people').hidden=!p;$('#exercise').hidden=!x;$('#meals').hidden=!m;$('#lists').hidden=p||x||m;$('#bar').hidden=p||x||m;
+ $('#ttl').textContent=p?'People':x?'Exercise':m?'Meals':'To-Dos';$('#tabBtn').textContent=p?'☑':'👥';$('#exBtn').textContent=x?'☑':'🏃';$('#mlBtn').textContent=m?'☑':'🍽';
+ if(p)loadPeople();if(x)loadEx();if(m)loadMl()}
+$('#tabBtn').onclick=()=>setView(view==='people'?'todos':'people');$('#exBtn').onclick=()=>setView(view==='exercise'?'todos':'exercise');$('#mlBtn').onclick=()=>setView(view==='meals'?'todos':'meals');
+$('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():view==='meals'?loadMl():load();
 
 
 // ---- Due dates & reminders ----
@@ -177,4 +177,36 @@ $('#exedit').addEventListener('close',()=>{const v=$('#exedit').returnValue,id=e
  if(v==='delete'){if(confirm('Delete this entry?'))commitEx(D=>{D.entries=D.entries.filter(x=>x.id!==id)},'Delete exercise entry');return}
  if(v!=='save'||F.activity.value==='__new')return;const u={activity:F.activity.value,minutes:+F.minutes.value,at:new Date(F.at.value).toISOString()};
  commitEx(D=>{types.forEach(t=>{if(!D.activityTypes.includes(t))D.activityTypes.push(t)});const x=D.entries.find(y=>y.id===id);if(x)Object.assign(x,u)},`Edit exercise ${u.activity}`)});
+
+// ---- Meals ----
+const MAPI=`https://api.github.com/repos/${OWNER}/${REPO}/contents/meals.json`;let ml=null,msha=null,mid=null;
+function mmsg(m){$('#mllist').innerHTML=`<p class="empty">${esc(m)}</p>`}
+const mlNorm=d=>{d=d||{};d.schemaVersion=d.schemaVersion||1;d.entries=d.entries||[];return d};
+async function fetchMl(){const r=await fetch(MAPI+'?ref='+BRANCH+'&t='+Date.now(),{headers:H(),cache:'no-store'});
+ if(r.status===404){ml=mlNorm();msha=null;return}if(r.status===401||r.status===403)throw new Error('auth');if(!r.ok)throw new Error('HTTP '+r.status);
+ const j=await r.json();msha=j.sha;ml=mlNorm(JSON.parse(b64d(j.content)));localStorage.setItem('mcache',JSON.stringify(ml))}
+async function loadMl(){if(!tok()){mmsg('Add your GitHub key in ⚙ to load your meals.');return}if(!ml)mmsg('Loading meals…');
+ try{await fetchMl()}catch(e){const c=localStorage.getItem('mcache');if(c){ml=mlNorm(JSON.parse(c));status('Offline/error — showing saved meals ('+e.message+')')}
+  else{ml=null;mmsg(e.message==='auth'?'GitHub key was rejected. Update it in ⚙.':'Could not load meals: '+e.message+'. Tap ⟳ to retry.');return}}renderMl()}
+async function commitMl(change,msg){if(!navigator.onLine){alert('Offline — changes need a connection');return}
+ for(let i=0;i<3;i++){change(ml);renderMl();const body={message:msg,content:b64e(JSON.stringify(ml,null,2)+'\n'),branch:BRANCH};if(msha)body.sha=msha;
+  const r=await fetch(MAPI,{method:'PUT',headers:H(),body:JSON.stringify(body)});
+  if(r.ok){msha=(await r.json()).content.sha;localStorage.setItem('mcache',JSON.stringify(ml));status('Saved');return}
+  if(r.status===409||r.status===422){status('Conflict — retrying');await fetchMl();continue}status('Save failed: HTTP '+r.status);return}
+ status('Save failed after retries');await loadMl()}
+function renderMl(){if(!ml)return;const F=$('#mlAdd');if(!F.at.value)F.at.value=localDT(Date.now());
+ if(!ml.entries.length){mmsg('No meals yet — add one above.');return}
+ const es=[...ml.entries].sort((a,b)=>new Date(b.at)-new Date(a.at)),days=new Map();
+ for(const e of es){const k=new Date(e.at).toDateString();if(!days.has(k))days.set(k,[]);days.get(k).push(e)}
+ let html='';for(const [k,list] of days){html+=`<section><h2>${esc(new Date(list[0].at).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}))} · ${list.length} meal${list.length>1?'s':''}</h2>`+
+  list.map(e=>`<div class="item"><div class="body"><div class="t">${esc(e.description)}</div><div class="meta">${esc(new Date(e.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</div></div><button class="ed" data-id="${esc(e.id)}">✎</button></div>`).join('')+'</section>'}
+ $('#mllist').innerHTML=html;$('#mllist').querySelectorAll('.ed').forEach(b=>b.onclick=()=>openMl(b.dataset.id))}
+$('#mlAdd').onsubmit=ev=>{ev.preventDefault();if(!tok())return openSettings();if(!ml)return alert('Meals not loaded yet — tap ⟳');const F=$('#mlAdd');
+ const e={id:Math.random().toString(16).slice(2,10),at:new Date(F.at.value).toISOString(),description:F.description.value.trim()};if(!e.description)return;
+ F.description.value='';F.at.value=localDT(Date.now());commitMl(D=>{if(!D.entries.some(x=>x.id===e.id))D.entries.push(e)},'Log meal')};
+function openMl(id){const e=ml.entries.find(x=>x.id===id);if(!e)return;mid=id;const F=$('#mlForm');F.description.value=e.description;F.at.value=localDT(e.at);$('#mledit').showModal()}
+$('#mledit').addEventListener('close',()=>{const v=$('#mledit').returnValue,id=mid,F=$('#mlForm');
+ if(v==='delete'){if(confirm('Delete this meal?'))commitMl(D=>{D.entries=D.entries.filter(x=>x.id!==id)},'Delete meal');return}
+ if(v!=='save')return;const u={description:F.description.value.trim(),at:new Date(F.at.value).toISOString()};if(!u.description)return;
+ commitMl(D=>{const x=D.entries.find(y=>y.id===id);if(x)Object.assign(x,u)},'Edit meal')});
 setView(view);loadPeople();
