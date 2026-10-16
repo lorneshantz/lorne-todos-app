@@ -6,7 +6,8 @@ const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,''))
 const b64e=s=>{const b=new TextEncoder().encode(s);let r='';b.forEach(x=>r+=String.fromCharCode(x));return btoa(r)};
 const now=()=>new Date().toISOString();const status=m=>$('#status').textContent=m||'';
 function norm(d){d=d||{};d.schemaVersion=d.schemaVersion||1;d.todos=(d.todos||[]).map(t=>({steps:[],status:'open',list:'Inbox',...t}));
- const s=new Set(d.lists||['Inbox']);d.todos.forEach(t=>s.add(t.list));d.lists=[...s];return d}
+ const s=new Set(d.lists||['Inbox']);d.todos.forEach(t=>s.add(t.list));d.lists=[...s];d.favorites=(d.favorites||[]).filter(x=>d.lists.includes(x));if(d.schemaVersion<2)d.schemaVersion=2;return d}
+function sorted(d){const f=d.favorites,r=d.lists.filter(x=>!f.includes(x)).sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));return [...f,...r]}
 async function fetchData(){
  const r=await fetch(API+'?ref='+BRANCH+'&t='+Date.now(),{headers:{Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'},cache:'no-store'});
  if(r.status===401||r.status===403||r.status===404)throw new Error('auth');if(!r.ok)throw new Error('HTTP '+r.status);
@@ -28,9 +29,11 @@ function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt
 function render(){const m=$('#lists');m.innerHTML='';if(!data)return;
  const f=$('#filter').value.trim().toLowerCase(),showDone=$('#showDone').checked;
  const as=new Set(data.todos.map(t=>t.assignee).filter(Boolean));$('#assignees').innerHTML=[...as].map(a=>`<option value="${esc(a)}">`).join('');
- $('#listNames').innerHTML=data.lists.map(a=>`<option value="${esc(a)}">`).join('');
- let any=false;for(const L of data.lists){const items=data.todos.filter(t=>t.list===L&&(showDone||t.status!=='complete')&&(!f||(t.assignee||'').toLowerCase().includes(f)));
-  if(!items.length)continue;any=true;const s=document.createElement('section');s.innerHTML=`<h2>${esc(L)} (${items.length})</h2>`;
+ $('#listNames').innerHTML=sorted(data).map(a=>`<option value="${esc(a)}">`).join('');
+ let any=false;for(const L of sorted(data)){const items=data.todos.filter(t=>t.list===L&&(showDone||t.status!=='complete')&&(!f||(t.assignee||'').toLowerCase().includes(f)));
+  any=true;const fav=data.favorites.includes(L);const s=document.createElement('section');s.innerHTML=`<h2><button class="star${fav?' on':''}" title="${fav?'Unstar':'Star'} list">${fav?'★':'☆'}</button> ${esc(L)} (${items.length})</h2>`;
+  s.querySelector('.star').onclick=()=>commit(D=>{const i=D.favorites.indexOf(L);if(i>=0)D.favorites.splice(i,1);else D.favorites.push(L)},`${fav?'Unstar':'Star'} list ${L}`);
+  if(!items.length){const e=document.createElement('p');e.className='empty';e.textContent='No items';s.appendChild(e)}
   for(const t of items){const d=document.createElement('div');d.className='item'+(t.status==='complete'?' done':'');
    d.innerHTML=`<button class="chk">${t.status==='complete'?'✓':''}</button><div class="body"><div class="t">${esc(t.title)}</div>
    <div class="meta">${t.assignee?'👤 '+esc(t.assignee):''}</div>${t.steps&&t.steps.length?'<ul>'+t.steps.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}</div><button class="ed">✎</button>`;
