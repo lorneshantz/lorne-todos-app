@@ -378,7 +378,7 @@ async function loadGo(){if(!tok()){gomsg('Add your GitHub key in ⚙ to load goa
  catch(e){const c=localStorage.getItem('gocache');if(c){go=JSON.parse(c);status('Offline/error — showing saved goals ('+e.message+')')}
   else{gomsg(e.message==='auth'?'GitHub key was rejected. Update it in ⚙.':'Could not load goals: '+e.message+'. Tap ⟳ to retry.');return}}
  renderGo();// indicators (best effort, non-blocking)
- const [ex,wt,gl]=await Promise.all([ghRaw('exercise.json').catch(()=>null),ghRaw('weight-history.json').catch(()=>null),ghRaw('glucose.json').catch(()=>null)]);
+ fetchMl().catch(()=>{}).then(()=>renderFast());const [ex,wt,gl]=await Promise.all([ghRaw('exercise.json').catch(()=>null),ghRaw('weight-history.json').catch(()=>null),ghRaw('glucose.json').catch(()=>null)]);
  goX={ex:(ex&&ex.entries)||[],wt,gl};renderGo()}
 async function commitGo(change,msg){if(!navigator.onLine){alert('Offline — changes need a connection');return false}
  for(let i=0;i<3;i++){change(go);go.updated=now();renderGo();const body={message:msg,content:b64e(JSON.stringify(go,null,2)+'\n'),branch:BRANCH};if(gosha)body.sha=gosha;
@@ -413,7 +413,7 @@ function renderGo(){if(!go)return;const q=curQ();if(!q){gomsg('No current quarte
   ${v.minutes?`<div class="chips"><button class="chip" data-m="15">15</button><button class="chip" data-m="30">30</button><button class="chip" data-m="60">60</button><button class="chip tmr${running?' on':''}">${running?'■ Stop':'▶ Start'}</button></div>`:''}${v.heat}</div>`}).join('');
  $('#goCards').querySelectorAll('.gcard').forEach(c=>{const id=c.dataset.g;c.querySelectorAll('.chip[data-m]').forEach(b=>b.onclick=()=>logSession(id,+b.dataset.m));
   const t=c.querySelector('.tmr');if(t)t.onclick=()=>toggleTimer(id);const e=c.querySelector('.gtgt');if(e)e.onclick=()=>editTarget(id)});
- $('#nudgeTime').value=go.settings.nudgeTime||'';renderReview()}
+ $('#nudgeTime').value=go.settings.nudgeTime||'';renderReview();renderFast()}
 function weekPct(id){const g=curQ().goals.find(x=>x.id===id);if(!g||!g.targetMinutes)return null;const [s,e]=GC.periodBounds(g.period,new Date());return Math.round(GC.sumRange(GC.minutesByDay(id,go.sessions,goX.ex),s,e)/g.targetMinutes*100)}
 async function logSession(goalId,minutes,note){if(!tok())return openSettings();if(!go||!minutes)return;const s={id:newId(),at:now(),minutes,goalId};if(note)s.note=note;
  const g=curQ().goals.find(x=>x.id===goalId);const ok=await commitGo(D=>{if(!D.sessions.some(x=>x.id===s.id))D.sessions.push(s)},`Log ${minutes} min ${goalId}`);
@@ -445,4 +445,24 @@ function renderReview(){const el=$('#goReview');if(!showReview||!go){el.innerHTM
  $('#rvSave').onclick=()=>{const vals={};el.querySelectorAll('input[data-g]').forEach(i=>vals[i.dataset.g]=Math.max(0,parseInt(i.value)||0));
   commitGo(D=>{for(const g of D.quarters.find(q=>q.status==='current').goals)if(g.id in vals){if(vals[g.id])g.targetMinutes=vals[g.id];else delete g.targetMinutes}},'Weekly review: targets').then(ok=>ok&&toast('Targets saved ✓'))}}
 $('#nudgeSave').onclick=()=>{const v=$('#nudgeTime').value||null;commitGo(D=>{D.settings=D.settings||{};D.settings.nudgeTime=v},'Nudge time').then(ok=>ok&&toast(v?`Nudge at ${v} (only if behind)`:'Nudge off'))};
+
+// ---- Fasting line (derived from meals.json) ----
+let fastFix=false;
+const hm=t=>new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+function lastMeal(){const es=(ml&&ml.entries)||[];return es.length?es.reduce((a,b)=>Date.parse(b.at)>Date.parse(a.at)?b:a):null}
+function closeFasts(){if(!go||!ml)return;const es=ml.entries||[];const upd=[];
+ for(const f of go.fasts||[]){if(f.end)continue;const nx=es.map(e=>Date.parse(e.at)).filter(t=>t>Date.parse(f.start)).sort((a,b)=>a-b)[0];if(nx)upd.push([f.id,new Date(nx).toISOString(),Math.round((nx-Date.parse(f.start))/36e5*10)/10])}
+ if(upd.length)commitGo(D=>{for(const [id,end,hours] of upd){const f=(D.fasts||[]).find(x=>x.id===id);if(f&&!f.end){f.end=end;f.hours=hours}}},'Fast ended at next meal')}
+function renderFast(){const el=$('#fastLine');if(!el)return;const lm=go&&lastMeal();if(!lm){el.hidden=true;return}closeFasts();
+ const start=lm.at,hrs=Math.floor((Date.now()-Date.parse(start))/36e5),f=(go.fasts||[]).find(x=>x.start===start&&!x.end);
+ if(fastFix){el.hidden=false;el.innerHTML=`<input type="datetime-local" id="fxAt" value="${localDT(start)}"> <button id="fxSet">Set last meal time</button> <button id="fxAdd">Add missed meal</button> <button id="fxX">✕</button>`;
+  $('#fxX').onclick=()=>{fastFix=false;renderFast()};
+  $('#fxSet').onclick=()=>{const at=new Date($('#fxAt').value).toISOString(),id=lm.id;fastFix=false;commitMl(D=>{const e=D.entries.find(x=>x.id===id);if(e)e.at=at},'Correct last meal time').then(renderFast)};
+  $('#fxAdd').onclick=()=>{const e={id:newId(),at:new Date($('#fxAt').value).toISOString(),description:'meal (logged later)'};fastFix=false;commitMl(D=>{if(!D.entries.some(x=>x.id===e.id))D.entries.push(e)},'Log missed meal').then(renderFast)};return}
+ if(f){el.hidden=false;el.textContent=`⏱ Fasting ${hrs}h (since ${hm(start)})`;return}
+ if(hrs<12){el.hidden=true;return}
+ el.hidden=false;el.innerHTML=`Last meal was ${esc(hm(start))} — you're ${hrs}h in. Count it as a fast? <button id="fsYes">Yes</button> <button id="fsFix">Correct…</button>`;
+ $('#fsYes').onclick=()=>{const rec={id:newId(),start,confirmedAt:now(),hours:hrs};commitGo(D=>{D.fasts=D.fasts||[];if(!D.fasts.some(x=>x.start===start))D.fasts.push(rec)},'Confirm fast').then(ok=>ok&&toast('Fast counted ✓'))};
+ $('#fsFix').onclick=()=>{fastFix=true;renderFast()}}
+setInterval(()=>{if(view==='goals'&&!document.hidden&&!fastFix)renderFast()},60000);
 setView(view);loadPeople();

@@ -30,3 +30,4 @@ menu button{padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:20px;font-size:15px;z-index:50}
 header{gap:2px;padding-left:10px;padding-right:6px}header h1{font-size:18px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}header button{font-size:19px;padding:4px 3px;flex:none}
 .heat{max-width:126px}
+.fastline{font-size:14px;color:#444;margin:-4px 2px 10px}.fastline button{padding:4px 10px;border-radius:8px;border:1px solid #ccc;background:#fff;font-size:14px}.fastline input{font-size:14px;padding:4px}
