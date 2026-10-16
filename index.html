@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f2937"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Lorne To-Dos</title><link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css"></head>
+<body><header><h1>To-Dos</h1><button id="refresh" title="Refresh">⟳</button><button id="settingsBtn" title="Settings">⚙</button></header>
+<div id="bar"><input id="filter" placeholder="Filter by assignee" list="assignees"><datalist id="assignees"></datalist>
+<label><input type="checkbox" id="showDone"> Show completed</label></div>
+<div id="status"></div><main id="lists"></main>
+<dialog id="edit"><form method="dialog" id="editForm"><h2>Edit item</h2>
+<label>Title<input name="title" required></label>
+<label>List<input name="list" list="listNames" required></label><datalist id="listNames"></datalist>
+<label>Assignee<input name="assignee"></label>
+<label>Steps (one per line)<textarea name="steps" rows="5"></textarea></label>
+<label>Status<select name="status"><option>open</option><option>complete</option></select></label>
+<menu><button value="cancel" formnovalidate>Cancel</button><button value="save" id="saveBtn">Save</button></menu></form></dialog>
+<dialog id="settings"><form method="dialog" id="setForm"><h2>GitHub access</h2>
+<p>Paste a fine-grained token with Contents read/write on <b>lorneshantz/lorne-todos</b> only. Stored only on this device.</p>
+<label>Token<input name="token" type="password" autocomplete="off"></label>
+<menu><button value="signout" formnovalidate>Sign out</button><button value="cancel" formnovalidate>Cancel</button><button value="save">Save</button></menu></form></dialog>
+<script src="app.js"></script></body></html>
