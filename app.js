@@ -81,12 +81,14 @@ $('#pedit').addEventListener('close',()=>{if($('#pedit').returnValue!=='save')re
  const v={name:F.name.value.trim(),email:F.email.value.trim()||null,cell:F.cell.value.trim()||null};if(!v.name)return;
  commitPeople(P=>{const j=old==null?-1:P.people.findIndex(x=>x.name===old);if(j>=0)Object.assign(P.people[j],v);else if(!P.people.some(x=>x.name===v.name))P.people.push(v)},`${old==null?'Add':'Edit'} person ${v.name}`)});
 $('#addPerson').onclick=()=>{if(!tok())return openSettings();if(!people)return alert('People list not loaded yet — tap ⟳');openPerson(null)};
-function setView(v){view=v;localStorage.setItem('view',v);const p=v==='people',x=v==='exercise',m=v==='meals';
- $('#people').hidden=!p;$('#exercise').hidden=!x;$('#meals').hidden=!m;$('#lists').hidden=p||x||m;$('#bar').hidden=p||x||m;
- $('#ttl').textContent=p?'People':x?'Exercise':m?'Meals':'To-Dos';$('#tabBtn').textContent=p?'☑':'👥';$('#exBtn').textContent=x?'☑':'🏃';$('#mlBtn').textContent=m?'☑':'🍽';
- if(p)loadPeople();if(x)loadEx();if(m)loadMl()}
-$('#tabBtn').onclick=()=>setView(view==='people'?'todos':'people');$('#exBtn').onclick=()=>setView(view==='exercise'?'todos':'exercise');$('#mlBtn').onclick=()=>setView(view==='meals'?'todos':'meals');
-$('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():view==='meals'?loadMl():load();
+const VIEWS={people:['#people','👥','People'],exercise:['#exercise','🏃','Exercise'],meals:['#meals','🍽','Meals'],glucose:['#glucose','🩸','Glucose']};
+const BTN={people:'#tabBtn',exercise:'#exBtn',meals:'#mlBtn',glucose:'#glBtn'};
+function setView(v){if(v!=='todos'&&!VIEWS[v])v='todos';view=v;localStorage.setItem('view',v);
+ for(const k in VIEWS){$(VIEWS[k][0]).hidden=k!==v;$(BTN[k]).textContent=k===v?'☑':VIEWS[k][1]}
+ $('#lists').hidden=v!=='todos';$('#bar').hidden=v!=='todos';$('#ttl').textContent=v==='todos'?'To-Dos':VIEWS[v][2];
+ if(v==='people')loadPeople();if(v==='exercise')loadEx();if(v==='meals')loadMl();if(v==='glucose')loadGl()}
+for(const k in BTN)$(BTN[k]).onclick=()=>setView(view===k?'todos':k);
+$('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():view==='meals'?loadMl():view==='glucose'?loadGl():load();
 
 
 // ---- Due dates & reminders ----
@@ -219,4 +221,40 @@ function editType(old){const n=prompt(`Rename "${old}" (leave empty to remove th
   D.entries.forEach(e=>{if(e.activity===old)e.activity=v})},`Rename exercise type ${old} → ${v}`)}
 $('#addType').onclick=()=>{if(!tok())return openSettings();if(!ex)return alert('Log not loaded yet — tap ⟳');const v=(prompt('New activity type')||'').trim();if(!v)return;
  commitEx(D=>{if(!D.activityTypes.includes(v))D.activityTypes.push(v)},`Add exercise type ${v}`)};
+
+// ---- Glucose (read-only; synced by GitHub Action) ----
+const GAPI=`https://api.github.com/repos/${OWNER}/${REPO}/contents/glucose.json`;let gl=null,glRange=localStorage.getItem('glRange')||'day';
+function gmsg(m){$('#glCur').innerHTML=`<p class="empty">${esc(m)}</p>`;$('#glChart').innerHTML='';$('#glInfo').textContent=''}
+async function loadGl(){if(!tok()){gmsg('Add your GitHub key in ⚙ to load glucose.');return}if(!gl)gmsg('Loading glucose…');
+ try{const r=await fetch(GAPI+'?ref='+BRANCH+'&t='+Date.now(),{headers:{Authorization:'Bearer '+tok(),Accept:'application/vnd.github.raw+json'},cache:'no-store'});
+  if(r.status===404){gl=null;gmsg('No glucose data yet. Once the LibreLinkUp secrets are added, the first sync appears within ~15 min.');return}
+  if(r.status===401||r.status===403)throw new Error('auth');if(!r.ok)throw new Error('HTTP '+r.status);
+  gl=await r.json();try{localStorage.setItem('gcache',JSON.stringify({...gl,readings:gl.readings.slice(-9000)}))}catch(e){}}
+ catch(e){const c=localStorage.getItem('gcache');if(c){gl=JSON.parse(c);status('Offline/error — showing saved glucose ('+e.message+')')}
+  else{gmsg(e.message==='auth'?'GitHub key was rejected. Update it in ⚙.':'Could not load glucose: '+e.message+'. Tap ⟳ to retry.');return}}
+ renderGl()}
+const ARROW={1:'↓',2:'↘',3:'→',4:'↗',5:'↑'};
+function ago(t){const m=Math.round((Date.now()-Date.parse(t))/60000);return m<1?'just now':m<60?m+' min ago':m<1440?Math.floor(m/60)+' h '+(m%60)+' min ago':Math.floor(m/1440)+' days ago'}
+const mm=r=>r.mmol??Math.round(r.mgdl/18.0182*10)/10;
+function renderGl(){if(!gl)return;const c=gl.current||(gl.readings||[]).slice(-1)[0];
+ if(!c){gmsg(gl.lastError?'Sync problem: '+gl.lastError.message:'No readings yet.');return}
+ const v=mm(c),cls=v<3.9?'low':v>10?'high':'ok',old=Date.now()-Date.parse(c.t)>20*60000;
+ $('#glCur').innerHTML=`<div class="big ${cls}">${v.toFixed(1)}<span class="arr">${ARROW[c.trend]||''}</span></div><div class="unit">mmol/L · ${esc(c.mgdl)} mg/dL</div><div class="meta${old?' stale':''}">${esc(ago(c.t))}${old?' — sensor/sync may be behind':''}</div>`;
+ document.querySelectorAll('#glucose .seg button').forEach(b=>b.classList.toggle('on',b.dataset.r===glRange));
+ const now=Date.now(),d0=new Date();d0.setHours(0,0,0,0);const from=glRange==='day'?d0.getTime():now-(glRange==='week'?7:30)*864e5;
+ const pts=(gl.readings||[]).filter(r=>Date.parse(r.t)>=from);
+ const W=360,Hh=200,pl=28,pb=18,ymax=Math.max(14,...pts.map(mm))+1,ymin=2,to=glRange==='day'?d0.getTime()+864e5:now;
+ const X=t=>pl+(t-from)/(to-from)*(W-pl-4),Y=v=>(Hh-pb)-(v-ymin)/(ymax-ymin)*(Hh-pb-6);
+ let s=`<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="Glucose chart"><rect x="${pl}" y="${Y(10)}" width="${W-pl-4}" height="${Y(3.9)-Y(10)}" fill="#10b98122"/>`;
+ for(const g of [4,6,8,10,12,14,16,18].filter(g=>g<ymax))s+=`<line x1="${pl}" x2="${W-4}" y1="${Y(g)}" y2="${Y(g)}" stroke="#e5e7eb"/><text x="2" y="${Y(g)+4}" font-size="10" fill="#888">${g}</text>`;
+ const ticks=glRange==='day'?[0,6,12,18].map(h=>[d0.getTime()+h*36e5,h===0?'12a':h===12?'12p':(h%12)+(h<12?'a':'p')]):[...Array(glRange==='week'?7:5)].map((_,i,A)=>{const t=from+(i+0.5)*(to-from)/A.length;return [t,new Date(t).toLocaleDateString(undefined,{month:'numeric',day:'numeric'})]});
+ for(const [t,l] of ticks)s+=`<text x="${X(t)}" y="${Hh-4}" font-size="10" fill="#888" text-anchor="middle">${l}</text>`;
+ if(pts.length){let dpath='',prev=null;for(const r of pts){const t=Date.parse(r.t);dpath+=(prev&&t-prev<40*60000?'L':'M')+X(t).toFixed(1)+','+Y(mm(r)).toFixed(1);prev=t}
+  s+=`<path d="${dpath}" fill="none" stroke="#2563eb" stroke-width="${glRange==='day'?2:1.2}"/>`;
+  const inR=pts.filter(r=>mm(r)>=3.9&&mm(r)<=10).length;$('#glInfo').textContent=`${pts.length} readings · ${Math.round(inR/pts.length*100)}% in range (3.9–10.0)`+(gl.lastSync?` · synced ${ago(gl.lastSync)}`:'')}
+ else $('#glInfo').textContent='No readings in this range.'+(gl.lastSync?` Synced ${ago(gl.lastSync)}.`:'');
+ if(gl.lastError)$('#glInfo').textContent+=` · ⚠ ${gl.lastError.message}`;
+ $('#glChart').innerHTML=s+'</svg>'}
+document.querySelectorAll('#glucose .seg button').forEach(b=>b.onclick=()=>{glRange=b.dataset.r;localStorage.setItem('glRange',glRange);renderGl()});
+setInterval(()=>{if(view==='glucose'&&!document.hidden)loadGl()},5*60000);
 setView(view);loadPeople();

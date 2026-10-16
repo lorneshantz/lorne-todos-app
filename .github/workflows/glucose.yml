@@ -1,0 +1,40 @@
+name: glucose-sync
+on:
+  schedule: [{cron: '*/5 * * * *'}]
+  workflow_dispatch:
+concurrency: {group: glucose-sync, cancel-in-progress: false}
+permissions: {contents: read}
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check secrets
+        id: chk
+        env: {E: '${{ secrets.LIBRE_EMAIL }}', P: '${{ secrets.LIBRE_PASSWORD }}'}
+        run: |
+          if [ -z "$E" ] || [ -z "$P" ]; then echo "::notice::LIBRE_EMAIL / LIBRE_PASSWORD not set; skipping."; echo ok=0 >> $GITHUB_OUTPUT; else echo ok=1 >> $GITHUB_OUTPUT; fi
+      - if: steps.chk.outputs.ok == '1'
+        uses: actions/checkout@v4
+      - if: steps.chk.outputs.ok == '1'
+        uses: actions/checkout@v4
+        with: {repository: lorneshantz/lorne-todos, ssh-key: '${{ secrets.LORNE_TODOS_DEPLOY_KEY }}', path: data}
+      - if: steps.chk.outputs.ok == '1'
+        uses: actions/setup-node@v4
+        with: {node-version: 20}
+      - if: steps.chk.outputs.ok == '1'
+        run: node glucose/sync.js
+        env:
+          DATA_DIR: data
+          LIBRE_EMAIL: ${{ secrets.LIBRE_EMAIL }}
+          LIBRE_PASSWORD: ${{ secrets.LIBRE_PASSWORD }}
+          LIBRE_REGION: ${{ secrets.LIBRE_REGION }}
+      - if: steps.chk.outputs.ok == '1'
+        name: Commit
+        working-directory: data
+        run: |
+          git config user.name "glucose-sync-bot"; git config user.email "lorneshantz@users.noreply.github.com"
+          git add glucose.json
+          if git diff --cached --quiet; then echo nothing; exit 0; fi
+          git commit -qm "glucose: sync [skip ci]"
+          for i in 1 2 3; do git pull --rebase -q && git push -q && exit 0; sleep 3; done; exit 1
