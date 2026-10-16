@@ -6,7 +6,7 @@ const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,''))
 const b64e=s=>{const b=new TextEncoder().encode(s);let r='';b.forEach(x=>r+=String.fromCharCode(x));return btoa(r)};
 const now=()=>new Date().toISOString();const status=m=>$('#status').textContent=m||'';
 function norm(d){d=d||{};d.schemaVersion=d.schemaVersion||1;d.todos=(d.todos||[]).map(t=>({steps:[],status:'open',list:'Inbox',...t}));
- const s=new Set(d.lists||['Inbox']);d.todos.forEach(t=>s.add(t.list));d.lists=[...s];d.favorites=(d.favorites||[]).filter(x=>d.lists.includes(x));if(d.schemaVersion<3)d.schemaVersion=3;return d}
+ const s=new Set(d.lists||['Inbox']);d.todos.forEach(t=>s.add(t.list));d.lists=[...s];d.favorites=(d.favorites||[]).filter(x=>d.lists.includes(x));if(d.schemaVersion<4)d.schemaVersion=4;return d}
 function sorted(d){const f=d.favorites,r=d.lists.filter(x=>!f.includes(x)).sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));return [...f,...r]}
 async function fetchData(){
  const r=await fetch(API+'?ref='+BRANCH+'&t='+Date.now(),{headers:{Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'},cache:'no-store'});
@@ -35,15 +35,15 @@ var render=function(){const m=$('#lists');m.innerHTML='';if(!data)return;
   s.querySelector('.star').onclick=()=>commit(D=>{const i=D.favorites.indexOf(L);if(i>=0)D.favorites.splice(i,1);else D.favorites.push(L)},`${fav?'Unstar':'Star'} list ${L}`);
   if(!items.length){const e=document.createElement('p');e.className='empty';e.textContent='No items';s.appendChild(e)}
   for(const t of items){const d=document.createElement('div');d.className='item'+(t.status==='complete'?' done':'');
-   d.innerHTML=`<button class="chk">${t.status==='complete'?'✓':''}</button><div class="body"><div class="t">${esc(t.title)}</div>
+   d.innerHTML=`<button class="chk">${t.status==='complete'?'✓':''}</button><div class="body"><div class="t">${t.recurrence?'<span title="Repeats">🔁</span> ':''}${esc(t.title)}</div>
    <div class="meta">${t.assignee?'👤 '+esc(t.assignee)+' ':''}${t.due?`<span class="due${t.status!=='complete'&&dueAt(t)<Date.now()?' late':''}">📅 ${esc(fmtDue(t))}</span>`:''}</div>${t.steps&&t.steps.length?'<ul>'+t.steps.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}</div><button class="ed">✎</button>`;
-   d.querySelector('.chk').onclick=()=>commit(D=>{const x=D.todos.find(y=>y.id===t.id);if(x){x.status=x.status==='complete'?'open':'complete';x.updated=now()}},`Toggle ${t.title}`);
+   d.querySelector('.chk').onclick=()=>{const nid=newId();commit(D=>{const x=D.todos.find(y=>y.id===t.id);if(x){x.status=x.status==='complete'?'open':'complete';x.updated=now();if(x.status==='complete')spawnNext(D,x,nid)}},`Toggle ${t.title}`)}
    d.querySelector('.ed').onclick=()=>openEdit(t);s.appendChild(d)}m.appendChild(s)}
  if(!any)m.innerHTML='<p style="padding:14px;color:#666">Nothing to show.</p>'}
-function openEdit(t){editing=t.id;const F=$('#editForm');F.title.value=t.title;F.list.value=t.list;F.assignee.value=t.assignee||'';F.steps.value=(t.steps||[]).join('\n');F.status.value=t.status;F.due.value=t.due||'';F.dueTime.value=t.due?(t.dueTime||''):'';F.dueTime.disabled=!t.due;$('#edit').showModal()}
+function openEdit(t){editing=t.id;const F=$('#editForm');F.title.value=t.title;F.list.value=t.list;F.assignee.value=t.assignee||'';F.steps.value=(t.steps||[]).join('\n');F.status.value=t.status;F.due.value=t.due||'';F.dueTime.value=t.due?(t.dueTime||''):'';F.dueTime.disabled=!t.due;const rc=t.recurrence||{};F.rtype.value=rc.type||'';F.rint.value=rc.interval||1;F.rwd.value=String(rc.weekday??(t.due?pd(t.due).getDay():new Date().getDay()));F.rmd.value=rc.monthDay||(t.due?pd(t.due).getDate():new Date().getDate());rUI();$('#edit').showModal()}
 $('#edit').addEventListener('close',()=>{if($('#edit').returnValue!=='save')return;const F=$('#editForm'),id=editing;
- const v={title:F.title.value.trim(),list:F.list.value.trim()||'Inbox',assignee:F.assignee.value.trim(),steps:F.steps.value.split('\n').map(s=>s.trim()).filter(Boolean),status:F.status.value,due:F.due.value||'',dueTime:F.due.value?(F.dueTime.value||''):''};
- commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x)return;const oldDue=x.due,oldTime=x.dueTime;Object.assign(x,v,{updated:now()});if(!x.assignee)delete x.assignee;if(!x.due)delete x.due;if(!x.dueTime||!x.due)delete x.dueTime;if(x.due!==oldDue||x.dueTime!==oldTime)unmark(x.id);if(!D.lists.includes(v.list))D.lists.push(v.list)},`Edit ${v.title}`)});
+ const v={title:F.title.value.trim(),list:F.list.value.trim()||'Inbox',assignee:F.assignee.value.trim(),steps:F.steps.value.split('\n').map(s=>s.trim()).filter(Boolean),status:F.status.value,due:F.due.value||'',dueTime:F.due.value?(F.dueTime.value||''):''};const rec=readRec(F),nid=newId();
+ commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x)return;const wasDone=x.status==='complete';if(rec)x.recurrence=rec;else delete x.recurrence;const oldDue=x.due,oldTime=x.dueTime;Object.assign(x,v,{updated:now()});if(!x.assignee)delete x.assignee;if(!x.due)delete x.due;if(!x.dueTime||!x.due)delete x.dueTime;if(x.due!==oldDue||x.dueTime!==oldTime)unmark(x.id);if(!D.lists.includes(v.list))D.lists.push(v.list);if(!wasDone&&x.status==='complete')spawnNext(D,x,nid)},`Edit ${v.title}`)});
 function openSettings(){$('#setForm').token.value='';$('#settings').showModal()}
 $('#settings').addEventListener('close',()=>{const v=$('#settings').returnValue;
  if(v==='save'){const t=$('#setForm').token.value.trim();{const w=$('#setForm').wcid.value.trim();if(w)localStorage.setItem('withingsClientId',w)}if(t){localStorage.setItem('gh_token',t);load();people=null;loadPeople()}}
@@ -339,3 +339,21 @@ function renderWt(){const conn=+localStorage.getItem('wConnecting')||0,b=$('#wtB
 document.querySelectorAll('#wtSeg button').forEach(b=>b.onclick=()=>{wtRange=b.dataset.r;localStorage.setItem('wtRange',wtRange);renderWt()});
 withingsCallback();
 setView(view);loadPeople();
+
+// ---- Recurring to-dos ----
+const newId=()=>Math.random().toString(16).slice(2,10);
+const pd=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const fd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const dim=(y,m)=>new Date(y,m+1,0).getDate();
+function nextDue(rc,dueStr){const base=dueStr?pd(dueStr):(()=>{const d=new Date();d.setHours(0,0,0,0);return d})();const n=Math.max(1,+rc.interval||1);
+ if(rc.type==='daily'){const d=new Date(base);d.setDate(d.getDate()+n);return fd(d)}
+ if(rc.type==='weekly'){const w=rc.weekday??base.getDay();const d=new Date(base);do d.setDate(d.getDate()+1);while(d.getDay()!==w);d.setDate(d.getDate()+7*(n-1));return fd(d)}
+ if(rc.type==='monthly'){const md=rc.monthDay||base.getDate();let y=base.getFullYear(),m=base.getMonth()+n;y+=Math.floor(m/12);m%=12;return fd(new Date(y,m,Math.min(md,dim(y,m))))}
+ if(rc.type==='yearly'){const y=base.getFullYear()+n,m=base.getMonth();return fd(new Date(y,m,Math.min(base.getDate(),dim(y,m))))}return null}
+function spawnNext(D,x,nid){if(!x.recurrence||x.spawnedNext)return;if(D.todos.some(y=>y.id===nid))return;
+ const c={id:nid,title:x.title,list:x.list,steps:[...(x.steps||[])],status:'open',recurrence:{...x.recurrence},due:nextDue(x.recurrence,x.due),added:now(),updated:now(),spawnedFrom:x.id};
+ if(x.assignee)c.assignee=x.assignee;if(x.dueTime)c.dueTime=x.dueTime;D.todos.push(c);x.spawnedNext=nid}
+function readRec(F){const t=F.rtype.value;if(!t)return null;const r={type:t,interval:Math.max(1,+F.rint.value||1)};
+ if(t==='weekly')r.weekday=+F.rwd.value;if(t==='monthly')r.monthDay=Math.min(31,Math.max(1,+F.rmd.value||1));return r}
+function rUI(){const F=$('#editForm'),t=F.rtype.value;$('#rwdL').hidden=t!=='weekly';$('#rmdL').hidden=t!=='monthly';F.rint.disabled=!t}
+$('#editForm').rtype.addEventListener('change',rUI);
