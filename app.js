@@ -114,25 +114,34 @@ navigator.serviceWorker&&navigator.serviceWorker.ready.then(async r=>{try{if('pe
 $('#editForm').due.addEventListener('input',e=>{const T=$('#editForm').dueTime;T.disabled=!e.target.value;if(!e.target.value)T.value=''});
 
 // ---- Web Push ----
-const VAPID_PUBLIC='BMtG5QeCMcwcbWvjm_PeF63JA_0gTYoNcCTBLZRBWqQoEDkrT2UkDiqYEhI9FN0XR6XdXu3ykBORpQ9rT_btdno';
+const VAPID_PUBLIC='BNwHpc_ScVlB-gQxp1Riga3S52Vqg5e2ZuG6rbWeOxDHRSJyXduDNlZj9_afn3k3iDBhNXV4afG2_e49WJFU_gg';
 const SAPI=`https://api.github.com/repos/${OWNER}/${REPO}/contents/subscriptions.json`;
 function u8(b){const p='='.repeat((4-b.length%4)%4),s=atob((b+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(s,c=>c.charCodeAt(0))}
-function pushState(m){document.querySelectorAll('.pushState').forEach(e=>e.textContent=m);document.querySelectorAll('.pushBtn').forEach(b=>b.textContent=localStorage.getItem('pushOn')==='1'?'Push is on ✓ (re-register)':'Turn on push')}
+function pushState(m){document.querySelectorAll('.pushState').forEach(e=>e.textContent=m)}
 async function saveSub(sub){const H={Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'};
  for(let i=0;i<3;i++){let sha=null,f={subscriptions:[]};const g=await fetch(SAPI+'?ref='+BRANCH+'&t='+Date.now(),{headers:H,cache:'no-store'});
-  if(g.ok){const j=await g.json();sha=j.sha;f=JSON.parse(b64d(j.content));f.subscriptions=f.subscriptions||[]}else if(g.status!==404)throw new Error('HTTP '+g.status);
-  const s=sub.toJSON();if(f.subscriptions.some(x=>x.endpoint===s.endpoint))return;f.subscriptions.push({...s,added:now(),ua:navigator.userAgent.slice(0,120)});
+  if(g.ok){const j=await g.json();sha=j.sha;f=JSON.parse(b64d(j.content));f.subscriptions=f.subscriptions||[]}else if(g.status===401||g.status===403)throw new Error('GitHub key rejected (needs Contents write on lorne-todos)');else if(g.status!==404)throw new Error('HTTP '+g.status);
+  const s=sub.toJSON();if(f.subscriptions.some(x=>x.endpoint===s.endpoint))return 'exists';
+  f.subscriptions.push({...s,added:now(),key:VAPID_PUBLIC.slice(0,12),ua:navigator.userAgent.slice(0,120)});
   const body={message:'Add push subscription',content:b64e(JSON.stringify(f,null,2)+'\n'),branch:BRANCH};if(sha)body.sha=sha;
-  const r=await fetch(SAPI,{method:'PUT',headers:H,body:JSON.stringify(body)});if(r.ok)return;if(r.status!==409&&r.status!==422)throw new Error('HTTP '+r.status)}
- throw new Error('conflict')}
-async function turnOnPush(){try{if(!tok())return openSettings();
- if(!('serviceWorker' in navigator)||!('PushManager' in window))throw new Error('Push not supported here. iPhone: add to Home Screen and open from the icon (iOS 16.4+).');
- if(await Notification.requestPermission()!=='granted')throw new Error('Notifications are blocked — enable them in phone Settings.');
+  const r=await fetch(SAPI,{method:'PUT',headers:H,body:JSON.stringify(body)});if(r.ok)return 'added';if(r.status!==409&&r.status!==422)throw new Error('Save failed: HTTP '+r.status)}
+ throw new Error('Save failed: conflict')}
+function sameKey(sub){try{const k=sub.options&&sub.options.applicationServerKey;if(!k)return true;const a=new Uint8Array(k),b=u8(VAPID_PUBLIC);return a.length===b.length&&a.every((x,i)=>x===b[i])}catch(e){return true}}
+// mode: 'auto' (on open, silent), 'tap' (Turn on push), 'fresh' (Re-register)
+async function ensurePush(mode){try{
+ if(!tok()){if(mode!=='auto')openSettings();return}
+ if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))throw new Error('Push not supported here. iPhone: add to Home Screen and open from the icon (iOS 16.4+).');
+ if(mode==='auto'&&Notification.permission!=='granted')return;
+ if(Notification.permission!=='granted'&&await Notification.requestPermission()!=='granted')throw new Error('Notifications are blocked — enable them in phone Settings.');
  const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();
- if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:u8(VAPID_PUBLIC)});
- pushState('Saving…');await saveSub(sub);localStorage.setItem('pushOn','1');pushState('Push is on for this device.');notifUI();status('Push turned on')}
- catch(e){pushState(e.message);alert(e.message)}}
-document.querySelectorAll('.pushBtn').forEach(b=>b.onclick=turnOnPush);pushState('');
+ if(sub&&(mode==='fresh'||!sameKey(sub))){await sub.unsubscribe().catch(()=>{});sub=null}
+ if(!sub){if(mode==='auto'&&localStorage.getItem('pushOn')!=='1')return;pushState('Subscribing…');sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:u8(VAPID_PUBLIC)})}
+ pushState('Saving to server…');const r=await saveSub(sub);localStorage.setItem('pushOn','1');
+ pushState('Saved to server ✓'+(r==='added'?' (new)':''));if(mode!=='auto')status('Push on — saved to server ✓');notifUI()}
+ catch(e){if(mode!=='auto')localStorage.removeItem('pushOn');pushState('⚠ '+e.message);if(mode!=='auto')alert(e.message);notifUI()}}
+document.querySelectorAll('.pushBtn').forEach(b=>b.onclick=()=>ensurePush('tap'));
+document.querySelectorAll('.pushReBtn').forEach(b=>b.onclick=()=>ensurePush('fresh'));
+pushState(localStorage.getItem('pushOn')==='1'?'Checking…':'');ensurePush('auto');
 
 // ---- Exercise ----
 const EAPI=`https://api.github.com/repos/${OWNER}/${REPO}/contents/exercise.json`;let ex=null,esha=null,eid=null;
