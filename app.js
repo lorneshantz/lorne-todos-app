@@ -46,7 +46,7 @@ $('#edit').addEventListener('close',()=>{if($('#edit').returnValue!=='save')retu
  commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x)return;const oldDue=x.due,oldTime=x.dueTime;Object.assign(x,v,{updated:now()});if(!x.assignee)delete x.assignee;if(!x.due)delete x.due;if(!x.dueTime||!x.due)delete x.dueTime;if(x.due!==oldDue||x.dueTime!==oldTime)unmark(x.id);if(!D.lists.includes(v.list))D.lists.push(v.list)},`Edit ${v.title}`)});
 function openSettings(){$('#setForm').token.value='';$('#settings').showModal()}
 $('#settings').addEventListener('close',()=>{const v=$('#settings').returnValue;
- if(v==='save'){const t=$('#setForm').token.value.trim();if(t){localStorage.setItem('gh_token',t);load();people=null;loadPeople()}}
+ if(v==='save'){const t=$('#setForm').token.value.trim();{const w=$('#setForm').wcid.value.trim();if(w)localStorage.setItem('withingsClientId',w)}if(t){localStorage.setItem('gh_token',t);load();people=null;loadPeople()}}
  if(v==='signout'){localStorage.removeItem('gh_token');localStorage.removeItem('cache');localStorage.removeItem('pcache');people=null;pmsg('Add your GitHub key in ⚙ to load people.');data=null;render();status('Signed out')}});
 $('#settingsBtn').onclick=openSettings;$('#refresh').onclick=load;$('#filter').oninput=render;
 $('#showDone').checked=localStorage.getItem('showDone')==='1';$('#showDone').onchange=e=>{localStorage.setItem('showDone',e.target.checked?'1':'0');render()};
@@ -81,14 +81,14 @@ $('#pedit').addEventListener('close',()=>{if($('#pedit').returnValue!=='save')re
  const v={name:F.name.value.trim(),email:F.email.value.trim()||null,cell:F.cell.value.trim()||null};if(!v.name)return;
  commitPeople(P=>{const j=old==null?-1:P.people.findIndex(x=>x.name===old);if(j>=0)Object.assign(P.people[j],v);else if(!P.people.some(x=>x.name===v.name))P.people.push(v)},`${old==null?'Add':'Edit'} person ${v.name}`)});
 $('#addPerson').onclick=()=>{if(!tok())return openSettings();if(!people)return alert('People list not loaded yet — tap ⟳');openPerson(null)};
-const VIEWS={people:['#people','👥','People'],exercise:['#exercise','🏃','Exercise'],meals:['#meals','🍽','Meals'],glucose:['#glucose','🩸','Glucose']};
-const BTN={people:'#tabBtn',exercise:'#exBtn',meals:'#mlBtn',glucose:'#glBtn'};
+const VIEWS={people:['#people','👥','People'],exercise:['#exercise','🏃','Exercise'],meals:['#meals','🍽','Meals'],glucose:['#glucose','🩸','Glucose'],weight:['#weight','⚖️','Weight']};
+const BTN={people:'#tabBtn',exercise:'#exBtn',meals:'#mlBtn',glucose:'#glBtn',weight:'#wtBtn'};
 function setView(v){if(v!=='todos'&&!VIEWS[v])v='todos';view=v;localStorage.setItem('view',v);
  for(const k in VIEWS){$(VIEWS[k][0]).hidden=k!==v;$(BTN[k]).textContent=k===v?'☑':VIEWS[k][1]}
  $('#lists').hidden=v!=='todos';$('#bar').hidden=v!=='todos';$('#ttl').textContent=v==='todos'?'To-Dos':VIEWS[v][2];
- if(v==='people')loadPeople();if(v==='exercise')loadEx();if(v==='meals')loadMl();if(v==='glucose')loadGl()}
+ if(v==='people')loadPeople();if(v==='exercise')loadEx();if(v==='meals')loadMl();if(v==='glucose')loadGl();if(v==='weight')loadWt()}
 for(const k in BTN)$(BTN[k]).onclick=()=>setView(view===k?'todos':k);
-$('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():view==='meals'?loadMl():view==='glucose'?loadGl():load();
+$('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():view==='meals'?loadMl():view==='glucose'?loadGl():view==='weight'?loadWt():load();
 
 
 // ---- Due dates & reminders ----
@@ -279,4 +279,63 @@ function editOpt(old){const n=prompt(`Rename "${old}" (leave empty to remove; pa
  if(v===old)return;commitMl(D=>{const i=D.mealOptions.indexOf(old);if(i<0)return;if(D.mealOptions.includes(v))D.mealOptions.splice(i,1);else D.mealOptions[i]=v},`Rename meal option ${old} → ${v}`)}
 $('#addOpt').onclick=()=>{if(!tok())return openSettings();if(!ml)return alert('Meals not loaded yet — tap ⟳');const v=(prompt('New meal option')||'').trim();if(!v)return;
  commitMl(D=>{D.mealOptions=D.mealOptions||[];if(!D.mealOptions.includes(v))D.mealOptions.push(v)},`Add meal option ${v}`)};
+
+// ---- Weight (Withings; synced by GitHub Action) ----
+const W_REDIRECT='https://lorneshantz.github.io/lorne-todos-app/';
+const RAW=f=>`https://api.github.com/repos/${OWNER}/${REPO}/contents/${f}`;
+let wt=null,wtRange=localStorage.getItem('wtRange')||'month';
+async function ghRaw(f){const r=await fetch(RAW(f)+'?ref='+BRANCH+'&t='+Date.now(),{headers:{Authorization:'Bearer '+tok(),Accept:'application/vnd.github.raw+json'},cache:'no-store'});
+ if(r.status===404)return null;if(r.status===401||r.status===403)throw new Error('auth');if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+async function ghPut(f,obj,msg){const H={Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'};
+ for(let i=0;i<3;i++){let sha=null;const g=await fetch(RAW(f)+'?ref='+BRANCH+'&t='+Date.now(),{headers:H,cache:'no-store'});if(g.ok)sha=(await g.json()).sha;else if(g.status!==404)throw new Error('HTTP '+g.status);
+  const body={message:msg,content:b64e(JSON.stringify(obj,null,2)+'\n'),branch:BRANCH};if(sha)body.sha=sha;const r=await fetch(RAW(f),{method:'PUT',headers:H,body:JSON.stringify(body)});
+  if(r.ok)return;if(r.status!==409&&r.status!==422)throw new Error('Save failed: HTTP '+r.status)}throw new Error('Save failed: conflict')}
+function wmsg(m){$('#wtCur').innerHTML=`<p class="empty">${esc(m)}</p>`;$('#wtChart').innerHTML='';$('#wtInfo').textContent='';$('#wtComp').innerHTML=''}
+async function withingsConnect(){try{if(!tok())return openSettings();let cid=null;
+ try{const c=await ghRaw('withings-config.json');cid=c&&c.clientId}catch(e){}
+ cid=cid||localStorage.getItem('withingsClientId');
+ if(!cid){cid=(prompt('Paste your Withings client ID (from developer.withings.com). Or wait ~15 min after adding the GitHub secrets and try again.')||'').trim();if(!cid)return;localStorage.setItem('withingsClientId',cid)}
+ const st=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('wstate',st);
+ location.href='https://account.withings.com/oauth2_user/authorize2?'+new URLSearchParams({response_type:'code',client_id:cid,scope:'user.metrics',redirect_uri:W_REDIRECT,state:st})}
+ catch(e){alert('Could not start Withings connect: '+e.message)}}
+document.querySelectorAll('.wConnect').forEach(b=>b.onclick=withingsConnect);
+async function withingsCallback(){const q=new URLSearchParams(location.search);if(!q.has('code')&&!q.has('error'))return;
+ const code=q.get('code'),st=q.get('state'),err=q.get('error');history.replaceState(null,'',location.pathname+location.hash);
+ if(err){alert('Withings connect cancelled: '+err);return}
+ if(!st||st!==localStorage.getItem('wstate')){alert('Withings connect failed: state mismatch. Tap Connect Withings again.');return}
+ localStorage.removeItem('wstate');if(!tok()){alert('Add your GitHub key in ⚙ first, then tap Connect Withings again.');return}
+ try{await ghPut('withings-auth.json',{code,redirect_uri:W_REDIRECT,at:now()},'Withings auth code');localStorage.setItem('wConnecting',String(Date.now()));setView('weight');status('Withings: connecting… up to ~15 min')}
+ catch(e){alert('Could not save Withings connection: '+e.message)}}
+const LB=2.20462;
+async function loadWt(){if(!tok()){wmsg('Add your GitHub key in ⚙ to load weight.');return}if(!wt)wmsg('Loading weight…');
+ try{wt=await ghRaw('weight-history.json');if(wt)localStorage.setItem('wcache',JSON.stringify(wt))}
+ catch(e){const c=localStorage.getItem('wcache');if(c){wt=JSON.parse(c);status('Offline/error — showing saved weight ('+e.message+')')}
+  else{wmsg(e.message==='auth'?'GitHub key was rejected. Update it in ⚙.':'Could not load weight: '+e.message+'. Tap ⟳ to retry.');return}}
+ renderWt()}
+function renderWt(){const conn=+localStorage.getItem('wConnecting')||0,b=$('#wtBanner');
+ if(wt&&wt.lastSync&&Date.parse(wt.lastSync)>conn&&!wt.needsReconnect)localStorage.removeItem('wConnecting');
+ const connecting=localStorage.getItem('wConnecting')&&Date.now()-conn<60*60000;
+ b.hidden=false;if(connecting)b.textContent='Connecting to Withings… this can take up to ~15 min.';
+ else if(wt&&wt.needsReconnect){b.innerHTML=`⚠ ${esc((wt.lastError&&wt.lastError.message)||'Withings needs reconnecting.')} <button type="button" class="wConnect">Reconnect Withings</button>`;b.querySelector('.wConnect').onclick=withingsConnect}
+ else b.hidden=true;
+ const rs=(wt&&wt.readings||[]).filter(r=>r.weightKg!=null);
+ if(!rs.length){wmsg(connecting?'Waiting for the first Withings sync…':!wt?'No weight data yet. Add the Withings secrets in GitHub, then tap Connect Withings below.':'No weigh-ins yet. Step on the scale and wait for the next sync.');if(wt&&wt.lastError&&!wt.needsReconnect)$('#wtInfo').textContent='⚠ '+wt.lastError.message;return}
+ const c=rs.at(-1),now=Date.now(),wk=rs.filter(r=>Date.parse(r.t)>=now-7*864e5),avg=wk.reduce((s,r)=>s+r.weightKg,0)/(wk.length||1);
+ const d=c.weightKg-avg,arr=Math.abs(d)<0.25?'→':d>0?'↗':'↘';
+ $('#wtCur').innerHTML=`<div class="big wt">${(c.weightKg*LB).toFixed(1)}<span class="u"> lb</span><span class="arr">${arr}</span></div><div class="unit">${c.weightKg.toFixed(1)} kg · 7-day avg ${(avg*LB).toFixed(1)} lb</div><div class="meta">${esc(ago(c.t))}</div>`;
+ document.querySelectorAll('#wtSeg button').forEach(x=>x.classList.toggle('on',x.dataset.r===wtRange));
+ const d0=new Date();d0.setHours(0,0,0,0);const from=wtRange==='day'?d0.getTime():now-(wtRange==='week'?7:30)*864e5,to=wtRange==='day'?d0.getTime()+864e5:now;
+ const pts=rs.filter(r=>Date.parse(r.t)>=from),W=360,Hh=200,pl=34,pb=18;
+ if(!pts.length){$('#wtChart').innerHTML='';$('#wtInfo').textContent='No weigh-ins in this range.'}
+ else{const vs=pts.map(r=>r.weightKg*LB);let lo=Math.min(...vs),hi=Math.max(...vs);if(hi-lo<4){const m=(hi+lo)/2;lo=m-2;hi=m+2}lo=Math.floor(lo-0.5);hi=Math.ceil(hi+0.5);
+  const X=t=>pl+(t-from)/(to-from)*(W-pl-6),Y=v=>(Hh-pb)-(v-lo)/(hi-lo)*(Hh-pb-8);let s=`<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="Weight chart">`;
+  const step=Math.max(1,Math.ceil((hi-lo)/5));for(let g=Math.ceil(lo);g<=hi;g+=step)s+=`<line x1="${pl}" x2="${W-4}" y1="${Y(g)}" y2="${Y(g)}" stroke="#e5e7eb"/><text x="2" y="${Y(g)+4}" font-size="10" fill="#888">${g}</text>`;
+  const pathD=pts.map((r,i)=>(i?'L':'M')+X(Date.parse(r.t)).toFixed(1)+','+Y(r.weightKg*LB).toFixed(1)).join('');
+  s+=`<path d="${pathD}" fill="none" stroke="#7c3aed" stroke-width="2"/>`+pts.map(r=>`<circle cx="${X(Date.parse(r.t)).toFixed(1)}" cy="${Y(r.weightKg*LB).toFixed(1)}" r="3" fill="#7c3aed"/>`).join('');
+  $('#wtChart').innerHTML=s+'</svg>';$('#wtInfo').textContent=`${pts.length} weigh-in${pts.length>1?'s':''}`+(wt.lastSync?` · synced ${ago(wt.lastSync)}`:'')+(wt.lastError&&!wt.needsReconnect?` · ⚠ ${wt.lastError.message}`:'')}
+ const comp=[['fatPct','Body fat',v=>v.toFixed(1)+' %'],['fatKg','Fat mass',v=>(v*LB).toFixed(1)+' lb'],['muscleKg','Muscle',v=>(v*LB).toFixed(1)+' lb'],['waterKg','Water',v=>(v*LB).toFixed(1)+' lb'],['boneKg','Bone',v=>(v*LB).toFixed(1)+' lb'],['fatFreeKg','Fat-free mass',v=>(v*LB).toFixed(1)+' lb']];
+ const last=k=>{for(let i=rs.length-1;i>=0;i--)if(rs[i][k]!=null)return rs[i][k];return null};const rows=comp.filter(([k])=>last(k)!=null);
+ $('#wtComp').innerHTML=rows.length?'<section><h2>Body composition</h2>'+rows.map(([k,l,f])=>`<div class="item"><div class="body"><div class="t">${l}</div></div><div>${f(last(k))}</div></div>`).join('')+'</section>':''}
+document.querySelectorAll('#wtSeg button').forEach(b=>b.onclick=()=>{wtRange=b.dataset.r;localStorage.setItem('wtRange',wtRange);renderWt()});
+withingsCallback();
 setView(view);loadPeople();
