@@ -183,7 +183,7 @@ $('#exedit').addEventListener('close',()=>{const v=$('#exedit').returnValue,id=e
 // ---- Meals ----
 const MAPI=`https://api.github.com/repos/${OWNER}/${REPO}/contents/meals.json`;let ml=null,msha=null,mid=null;
 function mmsg(m){$('#mllist').innerHTML=`<p class="empty">${esc(m)}</p>`}
-const mlNorm=d=>{d=d||{};d.schemaVersion=d.schemaVersion||1;d.entries=d.entries||[];return d};
+const mlNorm=d=>{d=d||{};d.schemaVersion=d.schemaVersion||1;d.mealOptions=d.mealOptions||[];d.entries=d.entries||[];return d};
 async function fetchMl(){const r=await fetch(MAPI+'?ref='+BRANCH+'&t='+Date.now(),{headers:H(),cache:'no-store'});
  if(r.status===404){ml=mlNorm();msha=null;return}if(r.status===401||r.status===403)throw new Error('auth');if(!r.ok)throw new Error('HTTP '+r.status);
  const j=await r.json();msha=j.sha;ml=mlNorm(JSON.parse(b64d(j.content)));localStorage.setItem('mcache',JSON.stringify(ml))}
@@ -196,7 +196,7 @@ async function commitMl(change,msg){if(!navigator.onLine){alert('Offline — cha
   if(r.ok){msha=(await r.json()).content.sha;localStorage.setItem('mcache',JSON.stringify(ml));status('Saved');return}
   if(r.status===409||r.status===422){status('Conflict — retrying');await fetchMl();continue}status('Save failed: HTTP '+r.status);return}
  status('Save failed after retries');await loadMl()}
-function renderMl(){if(!ml)return;const F=$('#mlAdd');if(!F.at.value)F.at.value=localDT(Date.now());
+function renderMl(){if(!ml)return;renderOpts();const F=$('#mlAdd');if(!F.at.value)F.at.value=localDT(Date.now());
  if(!ml.entries.length){mmsg('No meals yet — add one above.');return}
  const es=[...ml.entries].sort((a,b)=>new Date(b.at)-new Date(a.at)),days=new Map();
  for(const e of es){const k=new Date(e.at).toDateString();if(!days.has(k))days.set(k,[]);days.get(k).push(e)}
@@ -257,4 +257,17 @@ function renderGl(){if(!gl)return;const c=gl.current||(gl.readings||[]).slice(-1
  $('#glChart').innerHTML=s+'</svg>'}
 document.querySelectorAll('#glucose .seg button').forEach(b=>b.onclick=()=>{glRange=b.dataset.r;localStorage.setItem('glRange',glRange);renderGl()});
 setInterval(()=>{if(view==='glucose'&&!document.hidden)loadGl()},5*60000);
+
+// ---- Meal options ----
+function renderOpts(){const o=ml.mealOptions;
+ $('#mlChips').innerHTML=o.map((t,i)=>`<button type="button" class="chip" data-i="${i}">${esc(t)}</button>`).join('');
+ $('#mlChips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{$('#mlAdd').description.value=ml.mealOptions[+b.dataset.i];$('#mlAdd').description.focus()});
+ $('#mlOpts').innerHTML=o.map(t=>`<option value="${esc(t)}">`).join('');
+ $('#optList').innerHTML=o.map((t,i)=>`<div class="item"><div class="body"><div class="t">${esc(t)}</div></div><button class="ed" data-i="${i}">✎</button></div>`).join('')||'<p class="empty">No options yet.</p>';
+ $('#optList').querySelectorAll('.ed').forEach(b=>b.onclick=()=>editOpt(ml.mealOptions[+b.dataset.i]))}
+function editOpt(old){const n=prompt(`Rename "${old}" (leave empty to remove; past meals are unchanged)`,old);if(n===null)return;const v=n.trim();
+ if(!v){if(!confirm(`Remove option "${old}"?`))return;return commitMl(D=>{D.mealOptions=D.mealOptions.filter(t=>t!==old)},`Remove meal option ${old}`)}
+ if(v===old)return;commitMl(D=>{const i=D.mealOptions.indexOf(old);if(i<0)return;if(D.mealOptions.includes(v))D.mealOptions.splice(i,1);else D.mealOptions[i]=v},`Rename meal option ${old} → ${v}`)}
+$('#addOpt').onclick=()=>{if(!tok())return openSettings();if(!ml)return alert('Meals not loaded yet — tap ⟳');const v=(prompt('New meal option')||'').trim();if(!v)return;
+ commitMl(D=>{D.mealOptions=D.mealOptions||[];if(!D.mealOptions.includes(v))D.mealOptions.push(v)},`Add meal option ${v}`)};
 setView(view);loadPeople();

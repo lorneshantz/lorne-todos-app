@@ -20,3 +20,4 @@ menu button{padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:
 #glucose{margin:10px 14px}.glcur{text-align:center;background:#fff;border-radius:12px;padding:14px}.big{font-size:56px;font-weight:700;line-height:1}.big.ok{color:#059669}.big.low{color:#dc2626}.big.high{color:#d97706}.arr{font-size:40px;margin-left:6px}.unit{color:#555}.stale{color:#d97706}
 .seg{display:flex;gap:6px;margin:10px 0}.seg button{flex:1;padding:8px;border:1px solid #ccc;border-radius:8px;background:#fff;font-size:15px}.seg button.on{background:#1f2937;color:#fff}#glChart{background:#fff;border-radius:12px;padding:6px}.note{font-size:12px;color:#888}
 [hidden]{display:none!important}
+.chips{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 100%}.chip{padding:6px 12px;border-radius:16px;border:1px solid #ccc;background:#fff;font-size:14px}

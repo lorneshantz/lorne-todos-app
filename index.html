@@ -3,7 +3,7 @@
 <meta name="theme-color" content="#1f2937"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Lorne To-Dos</title><link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css?v=11"></head>
+<link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css?v=12"></head>
 <body><header><h1 id="ttl">To-Dos</h1><button id="tabBtn" title="People">👥</button><button id="exBtn" title="Exercise">🏃</button><button id="mlBtn" title="Meals">🍽</button><button id="glBtn" title="Glucose">🩸</button><button id="refresh" title="Refresh">⟳</button><button id="settingsBtn" title="Settings">⚙</button></header>
 <div id="bar"><input id="filter" placeholder="Filter by assignee" list="assignees"><datalist id="assignees"></datalist>
 <label><input type="checkbox" id="showDone"> Show completed</label></div>
@@ -16,8 +16,8 @@
 <label>Activity<select name="activity" id="exEAct"></select></label><label>Minutes<input name="minutes" type="number" min="1" step="1" required></label>
 <label>When<input name="at" type="datetime-local" required></label>
 <menu><button value="delete" formnovalidate>Delete</button><button value="cancel" formnovalidate>Cancel</button><button value="save">Save</button></menu></form></dialog>
-<main id="meals" hidden><form id="mlAdd" class="exadd"><input name="description" placeholder="What did you eat?" required style="flex:1 1 100%">
-<input name="at" type="datetime-local" required><button>Add</button></form><div id="mllist"></div></main>
+<main id="meals" hidden><form id="mlAdd" class="exadd"><div id="mlChips" class="chips"></div><input name="description" list="mlOpts" placeholder="What did you eat?" required style="flex:1 1 100%"><datalist id="mlOpts"></datalist>
+<input name="at" type="datetime-local" required><button>Add</button></form><div id="mllist"></div><details id="mlManage" class="types"><summary>Manage options</summary><div id="optList"></div><button id="addOpt" class="add">+ Add option</button></details></main>
 <dialog id="mledit"><form method="dialog" id="mlForm"><h2>Edit meal</h2>
 <label>Description<textarea name="description" rows="3" required></textarea></label><label>When<input name="at" type="datetime-local" required></label>
 <menu><button value="delete" formnovalidate>Delete</button><button value="cancel" formnovalidate>Cancel</button><button value="save">Save</button></menu></form></dialog>
@@ -42,4 +42,4 @@
 <label>Token<input name="token" type="password" autocomplete="off"></label>
 <p><button type="button" class="pushBtn">Turn on push</button> <span class="pushState"></span><br><small>Push works with the app closed. iPhone: only from the Home Screen app, iOS 16.4+.</small></p>
 <menu><button value="signout" formnovalidate>Sign out</button><button value="cancel" formnovalidate>Cancel</button><button value="save">Save</button></menu></form></dialog>
-<script src="app.js?v=11"></script></body></html>
+<script src="app.js?v=12"></script></body></html>
