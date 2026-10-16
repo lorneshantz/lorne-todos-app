@@ -96,15 +96,36 @@ async function checkDue(){if(!data||!('Notification' in window)||Notification.pe
  try{reg=await navigator.serviceWorker.ready}catch(e){}
  for(const t of data.todos){if(t.status==='complete'||!t.due||!t.dueTime)continue;const at=dueAt(t),key=t.due+'T'+(t.dueTime||'');
   if(at<=now&&n[t.id]!==key){n[t.id]=key;const o={body:'List: '+t.list,tag:'todo-'+t.id,icon:'icon-192.png'};
-   if(reg)reg.showNotification(t.title,o);else new Notification(t.title,o)}
-  else if(at>now&&reg&&'showTrigger' in Notification.prototype&&'TimestampTrigger' in window&&n['trig_'+t.id]!==key){ // bonus: Notification Triggers
+   if(localStorage.getItem('pushOn')==='1')continue;if(reg)reg.showNotification(t.title,o);else new Notification(t.title,o)}
+  else if(localStorage.getItem('pushOn')!=='1'&&at>now&&reg&&'showTrigger' in Notification.prototype&&'TimestampTrigger' in window&&n['trig_'+t.id]!==key){ // bonus: Notification Triggers
    try{reg.showNotification(t.title,{body:'List: '+t.list,tag:'todo-'+t.id,icon:'icon-192.png',showTrigger:new TimestampTrigger(at)});n['trig_'+t.id]=key;n[t.id]=key}catch(e){}}}
  localStorage.setItem('notified',JSON.stringify(n))}
 function notifUI(){const b=$('#notif');if(!('Notification' in window)){b.hidden=false;$('#notifMsg').textContent='Reminders not supported here. On iPhone, open from the Home Screen icon (iOS 16.4+).';$('#notifBtn').hidden=true;return}
- const p=Notification.permission;b.hidden=p==='granted';$('#notifBtn').hidden=p==='denied';
+ const p=Notification.permission;b.hidden=p==='granted'&&localStorage.getItem('pushOn')==='1';$('#notifBtn').hidden=p==='denied';
  $('#notifMsg').textContent=p==='denied'?'Reminders are blocked. Turn on notifications for this app in your phone Settings (iPhone: Settings › Notifications › To-Dos; Android: long-press icon › App info › Notifications).':'Get a reminder when a to-do is due.'}
 $('#notifBtn').onclick=async()=>{await Notification.requestPermission();notifUI();checkDue()};
 setInterval(()=>{checkDue();},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){checkDue();render()}});
 const _render=render;render=function(){_render();checkDue()};notifUI();
 navigator.serviceWorker&&navigator.serviceWorker.ready.then(async r=>{try{if('periodicSync' in r&&(await navigator.permissions.query({name:'periodic-background-sync'})).state==='granted')await r.periodicSync.register('due-check',{minInterval:15*60*1000})}catch(e){}});
 $('#editForm').due.addEventListener('input',e=>{const T=$('#editForm').dueTime;T.disabled=!e.target.value;if(!e.target.value)T.value=''});
+
+// ---- Web Push ----
+const VAPID_PUBLIC='BMtG5QeCMcwcbWvjm_PeF63JA_0gTYoNcCTBLZRBWqQoEDkrT2UkDiqYEhI9FN0XR6XdXu3ykBORpQ9rT_btdno';
+const SAPI=`https://api.github.com/repos/${OWNER}/${REPO}/contents/subscriptions.json`;
+function u8(b){const p='='.repeat((4-b.length%4)%4),s=atob((b+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(s,c=>c.charCodeAt(0))}
+function pushState(m){document.querySelectorAll('.pushState').forEach(e=>e.textContent=m);document.querySelectorAll('.pushBtn').forEach(b=>b.textContent=localStorage.getItem('pushOn')==='1'?'Push is on ✓ (re-register)':'Turn on push')}
+async function saveSub(sub){const H={Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'};
+ for(let i=0;i<3;i++){let sha=null,f={subscriptions:[]};const g=await fetch(SAPI+'?ref='+BRANCH+'&t='+Date.now(),{headers:H,cache:'no-store'});
+  if(g.ok){const j=await g.json();sha=j.sha;f=JSON.parse(b64d(j.content));f.subscriptions=f.subscriptions||[]}else if(g.status!==404)throw new Error('HTTP '+g.status);
+  const s=sub.toJSON();if(f.subscriptions.some(x=>x.endpoint===s.endpoint))return;f.subscriptions.push({...s,added:now(),ua:navigator.userAgent.slice(0,120)});
+  const body={message:'Add push subscription',content:b64e(JSON.stringify(f,null,2)+'\n'),branch:BRANCH};if(sha)body.sha=sha;
+  const r=await fetch(SAPI,{method:'PUT',headers:H,body:JSON.stringify(body)});if(r.ok)return;if(r.status!==409&&r.status!==422)throw new Error('HTTP '+r.status)}
+ throw new Error('conflict')}
+async function turnOnPush(){try{if(!tok())return openSettings();
+ if(!('serviceWorker' in navigator)||!('PushManager' in window))throw new Error('Push not supported here. iPhone: add to Home Screen and open from the icon (iOS 16.4+).');
+ if(await Notification.requestPermission()!=='granted')throw new Error('Notifications are blocked — enable them in phone Settings.');
+ const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();
+ if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:u8(VAPID_PUBLIC)});
+ pushState('Saving…');await saveSub(sub);localStorage.setItem('pushOn','1');pushState('Push is on for this device.');notifUI();status('Push turned on')}
+ catch(e){pushState(e.message);alert(e.message)}}
+document.querySelectorAll('.pushBtn').forEach(b=>b.onclick=turnOnPush);pushState('');
