@@ -81,11 +81,13 @@ $('#pedit').addEventListener('close',()=>{if($('#pedit').returnValue!=='save')re
  const v={name:F.name.value.trim(),email:F.email.value.trim()||null,cell:F.cell.value.trim()||null};if(!v.name)return;
  commitPeople(P=>{const j=old==null?-1:P.people.findIndex(x=>x.name===old);if(j>=0)Object.assign(P.people[j],v);else if(!P.people.some(x=>x.name===v.name))P.people.push(v)},`${old==null?'Add':'Edit'} person ${v.name}`)});
 $('#addPerson').onclick=()=>{if(!tok())return openSettings();if(!people)return alert('People list not loaded yet — tap ⟳');openPerson(null)};
-function setView(v){view=v;localStorage.setItem('view',v);const p=v==='people';$('#people').hidden=!p;$('#lists').hidden=p;$('#bar').hidden=p;
- $('#ttl').textContent=p?'People':'To-Dos';$('#tabBtn').textContent=p?'☑':'👥';if(p)loadPeople()}
-$('#tabBtn').onclick=()=>setView(view==='people'?'todos':'people');
-const _load=load;$('#refresh').onclick=()=>view==='people'?loadPeople():_load();
-setView(view);loadPeople();
+function setView(v){view=v;localStorage.setItem('view',v);const p=v==='people',x=v==='exercise';
+ $('#people').hidden=!p;$('#exercise').hidden=!x;$('#lists').hidden=p||x;$('#bar').hidden=p||x;
+ $('#ttl').textContent=p?'People':x?'Exercise':'To-Dos';$('#tabBtn').textContent=p?'☑':'👥';$('#exBtn').textContent=x?'☑':'🏃';
+ if(p)loadPeople();if(x)loadEx()}
+$('#tabBtn').onclick=()=>setView(view==='people'?'todos':'people');$('#exBtn').onclick=()=>setView(view==='exercise'?'todos':'exercise');
+$('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():load();
+
 
 // ---- Due dates & reminders ----
 function dueAt(t){if(!t.due)return Infinity;const [y,m,d]=t.due.split('-').map(Number);const [hh,mm]=(t.dueTime||'23:59').split(':').map(Number);return new Date(y,m-1,d,hh,mm).getTime()}
@@ -129,3 +131,50 @@ async function turnOnPush(){try{if(!tok())return openSettings();
  pushState('Saving…');await saveSub(sub);localStorage.setItem('pushOn','1');pushState('Push is on for this device.');notifUI();status('Push turned on')}
  catch(e){pushState(e.message);alert(e.message)}}
 document.querySelectorAll('.pushBtn').forEach(b=>b.onclick=turnOnPush);pushState('');
+
+// ---- Exercise ----
+const EAPI=`https://api.github.com/repos/${OWNER}/${REPO}/contents/exercise.json`;let ex=null,esha=null,eid=null;
+const H=()=>({Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'});
+function emsg(m){$('#exlist').innerHTML=`<p class="empty">${esc(m)}</p>`}
+function exNorm(d){d=d||{};d.schemaVersion=d.schemaVersion||1;d.activityTypes=d.activityTypes||['walk','treadmill'];d.entries=d.entries||[];return d}
+async function fetchEx(){const r=await fetch(EAPI+'?ref='+BRANCH+'&t='+Date.now(),{headers:H(),cache:'no-store'});
+ if(r.status===404){ex=exNorm();esha=null;return}if(r.status===401||r.status===403)throw new Error('auth');if(!r.ok)throw new Error('HTTP '+r.status);
+ const j=await r.json();esha=j.sha;ex=exNorm(JSON.parse(b64d(j.content)));localStorage.setItem('ecache',JSON.stringify(ex))}
+async function loadEx(){if(!tok()){emsg('Add your GitHub key in ⚙ to load your exercise log.');return}
+ if(!ex)emsg('Loading exercise log…');
+ try{await fetchEx()}catch(e){const c=localStorage.getItem('ecache');
+  if(c){ex=exNorm(JSON.parse(c));status('Offline/error — showing saved log ('+e.message+')')}
+  else{ex=null;emsg(e.message==='auth'?'GitHub key was rejected. Update it in ⚙.':'Could not load exercise log: '+e.message+'. Tap ⟳ to retry.');return}}
+ renderEx()}
+async function commitEx(change,msg){if(!navigator.onLine){alert('Offline — changes need a connection');return}
+ for(let i=0;i<3;i++){change(ex);renderEx();const body={message:msg,content:b64e(JSON.stringify(ex,null,2)+'\n'),branch:BRANCH};if(esha)body.sha=esha;
+  const r=await fetch(EAPI,{method:'PUT',headers:H(),body:JSON.stringify(body)});
+  if(r.ok){esha=(await r.json()).content.sha;localStorage.setItem('ecache',JSON.stringify(ex));status('Saved');return}
+  if(r.status===409||r.status===422){status('Conflict — retrying');await fetchEx();continue}status('Save failed: HTTP '+r.status);return}
+ status('Save failed after retries');await loadEx()}
+const pad=n=>String(n).padStart(2,'0');
+function localDT(d){d=new Date(d);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`}
+function actOpts(sel,cur){sel.innerHTML=ex.activityTypes.map(t=>`<option${t===cur?' selected':''}>${esc(t)}</option>`).join('')+'<option value="__new">+ New type…</option>';sel.dataset.prev=sel.value}
+function onAct(sel){sel.onchange=()=>{if(sel.value!=='__new'){sel.dataset.prev=sel.value;return}
+ const n=(prompt('New activity type')||'').trim();if(!n){sel.value=sel.dataset.prev||ex.activityTypes[0];return}
+ if(!ex.activityTypes.includes(n))ex.activityTypes.push(n);actOpts($('#exAct'),sel.id==='exAct'?n:$('#exAct').value);actOpts($('#exEAct'),sel.id==='exEAct'?n:$('#exEAct').value)}}
+onAct($('#exAct'));onAct($('#exEAct'));
+function renderEx(){if(!ex)return;const keep=$('#exAct').value;actOpts($('#exAct'),keep&&keep!=='__new'?keep:ex.activityTypes[0]);
+ const F=$('#exAdd');if(!F.at.value)F.at.value=localDT(Date.now());
+ if(!ex.entries.length){emsg('No entries yet — add one above.');return}
+ const es=[...ex.entries].sort((a,b)=>new Date(b.at)-new Date(a.at)),days=new Map();
+ for(const e of es){const k=new Date(e.at).toDateString();if(!days.has(k))days.set(k,[]);days.get(k).push(e)}
+ let html='';for(const [k,list] of days){const tot=list.reduce((s,e)=>s+(+e.minutes||0),0);
+  html+=`<section><h2>${esc(new Date(list[0].at).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}))} · ${tot} min</h2>`+
+  list.map(e=>`<div class="item"><div class="body"><div class="t">${esc(e.activity)} — ${esc(e.minutes)} min</div><div class="meta">${esc(new Date(e.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</div></div><button class="ed" data-id="${esc(e.id)}">✎</button></div>`).join('')+'</section>'}
+ $('#exlist').innerHTML=html;$('#exlist').querySelectorAll('.ed').forEach(b=>b.onclick=()=>openEx(b.dataset.id))}
+$('#exAdd').onsubmit=ev=>{ev.preventDefault();if(!tok())return openSettings();if(!ex)return alert('Log not loaded yet — tap ⟳');const F=$('#exAdd');
+ const e={id:Math.random().toString(16).slice(2,10),at:new Date(F.at.value).toISOString(),minutes:+F.minutes.value,activity:F.activity.value};
+ if(!e.minutes||e.activity==='__new')return;const types=[...ex.activityTypes];F.minutes.value='';F.at.value=localDT(Date.now());
+ commitEx(D=>{types.forEach(t=>{if(!D.activityTypes.includes(t))D.activityTypes.push(t)});if(!D.entries.some(x=>x.id===e.id))D.entries.push(e)},`Log ${e.minutes} min ${e.activity}`)};
+function openEx(id){const e=ex.entries.find(x=>x.id===id);if(!e)return;eid=id;const F=$('#exForm');actOpts($('#exEAct'),e.activity);F.minutes.value=e.minutes;F.at.value=localDT(e.at);$('#exedit').showModal()}
+$('#exedit').addEventListener('close',()=>{const v=$('#exedit').returnValue,id=eid,F=$('#exForm'),types=[...ex.activityTypes];
+ if(v==='delete'){if(confirm('Delete this entry?'))commitEx(D=>{D.entries=D.entries.filter(x=>x.id!==id)},'Delete exercise entry');return}
+ if(v!=='save'||F.activity.value==='__new')return;const u={activity:F.activity.value,minutes:+F.minutes.value,at:new Date(F.at.value).toISOString()};
+ commitEx(D=>{types.forEach(t=>{if(!D.activityTypes.includes(t))D.activityTypes.push(t)});const x=D.entries.find(y=>y.id===id);if(x)Object.assign(x,u)},`Edit exercise ${u.activity}`)});
+setView(view);loadPeople();
