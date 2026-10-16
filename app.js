@@ -159,7 +159,7 @@ function onAct(sel){sel.onchange=()=>{if(sel.value!=='__new'){sel.dataset.prev=s
  const n=(prompt('New activity type')||'').trim();if(!n){sel.value=sel.dataset.prev||ex.activityTypes[0];return}
  if(!ex.activityTypes.includes(n))ex.activityTypes.push(n);actOpts($('#exAct'),sel.id==='exAct'?n:$('#exAct').value);actOpts($('#exEAct'),sel.id==='exEAct'?n:$('#exEAct').value)}}
 onAct($('#exAct'));onAct($('#exEAct'));
-function renderEx(){if(!ex)return;const keep=$('#exAct').value;actOpts($('#exAct'),keep&&keep!=='__new'?keep:ex.activityTypes[0]);
+function renderEx(){if(!ex)return;renderTypes();const keep=$('#exAct').value;actOpts($('#exAct'),keep&&keep!=='__new'?keep:ex.activityTypes[0]);
  const F=$('#exAdd');if(!F.at.value)F.at.value=localDT(Date.now());
  if(!ex.entries.length){emsg('No entries yet — add one above.');return}
  const es=[...ex.entries].sort((a,b)=>new Date(b.at)-new Date(a.at)),days=new Map();
@@ -209,4 +209,14 @@ $('#mledit').addEventListener('close',()=>{const v=$('#mledit').returnValue,id=m
  if(v==='delete'){if(confirm('Delete this meal?'))commitMl(D=>{D.entries=D.entries.filter(x=>x.id!==id)},'Delete meal');return}
  if(v!=='save')return;const u={description:F.description.value.trim(),at:new Date(F.at.value).toISOString()};if(!u.description)return;
  commitMl(D=>{const x=D.entries.find(y=>y.id===id);if(x)Object.assign(x,u)},'Edit meal')});
+
+// ---- Exercise types ----
+function renderTypes(){$('#typeList').innerHTML=ex.activityTypes.map((t,i)=>`<div class="item"><div class="body"><div class="t">${esc(t)}</div><div class="meta">${ex.entries.filter(e=>e.activity===t).length} entries</div></div><button class="ed" data-i="${i}">✎</button></div>`).join('')||'<p class="empty">No types yet.</p>';
+ $('#typeList').querySelectorAll('.ed').forEach(b=>b.onclick=()=>editType(ex.activityTypes[+b.dataset.i]))}
+function editType(old){const n=prompt(`Rename "${old}" (leave empty to remove the type; past entries keep their name)`,old);if(n===null)return;const v=n.trim();
+ if(!v){if(!confirm(`Remove type "${old}"?`))return;return commitEx(D=>{D.activityTypes=D.activityTypes.filter(t=>t!==old)},`Remove exercise type ${old}`)}
+ if(v===old)return;commitEx(D=>{const i=D.activityTypes.indexOf(old);if(i<0)return;if(D.activityTypes.includes(v))D.activityTypes.splice(i,1);else D.activityTypes[i]=v;
+  D.entries.forEach(e=>{if(e.activity===old)e.activity=v})},`Rename exercise type ${old} → ${v}`)}
+$('#addType').onclick=()=>{if(!tok())return openSettings();if(!ex)return alert('Log not loaded yet — tap ⟳');const v=(prompt('New activity type')||'').trim();if(!v)return;
+ commitEx(D=>{if(!D.activityTypes.includes(v))D.activityTypes.push(v)},`Add exercise type ${v}`)};
 setView(view);loadPeople();

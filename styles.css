@@ -16,3 +16,4 @@ menu button{padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:
 #notif{margin:0 14px 8px;padding:10px;background:#fef3c7;border-radius:10px;font-size:14px}#notif button{margin-top:6px;padding:6px 12px;border-radius:8px;border:0;background:#1f2937;color:#fff}
 #exercise{margin:10px 14px}.exadd{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.exadd select,.exadd input{font-size:16px;padding:8px;border:1px solid #ccc;border-radius:8px}.exadd input[type=number]{width:70px}.exadd input[type=datetime-local]{flex:1;min-width:170px}.exadd button{padding:8px 14px;border-radius:8px;border:0;background:#1f2937;color:#fff;font-size:15px}
 #meals{margin:10px 14px}
+.types{margin-top:16px}.types summary{font-weight:600;color:#555;padding:6px 0}

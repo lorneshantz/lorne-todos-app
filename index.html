@@ -3,7 +3,7 @@
 <meta name="theme-color" content="#1f2937"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Lorne To-Dos</title><link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css?v=8"></head>
+<link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css?v=9"></head>
 <body><header><h1 id="ttl">To-Dos</h1><button id="tabBtn" title="People">👥</button><button id="exBtn" title="Exercise">🏃</button><button id="mlBtn" title="Meals">🍽</button><button id="refresh" title="Refresh">⟳</button><button id="settingsBtn" title="Settings">⚙</button></header>
 <div id="bar"><input id="filter" placeholder="Filter by assignee" list="assignees"><datalist id="assignees"></datalist>
 <label><input type="checkbox" id="showDone"> Show completed</label></div>
@@ -11,7 +11,7 @@
 <main id="people" hidden><button id="addPerson" class="add">+ Add person</button><div id="plist"></div></main>
 <main id="exercise" hidden><form id="exAdd" class="exadd"><select name="activity" id="exAct"></select>
 <input name="minutes" type="number" min="1" step="1" inputmode="numeric" placeholder="Min" required>
-<input name="at" type="datetime-local" required><button>Add</button></form><div id="exlist"></div></main>
+<input name="at" type="datetime-local" required><button>Add</button></form><div id="exlist"></div><details id="exTypes" class="types"><summary>Manage types</summary><div id="typeList"></div><button id="addType" class="add">+ Add type</button></details></main>
 <dialog id="exedit"><form method="dialog" id="exForm"><h2>Edit entry</h2>
 <label>Activity<select name="activity" id="exEAct"></select></label><label>Minutes<input name="minutes" type="number" min="1" step="1" required></label>
 <label>When<input name="at" type="datetime-local" required></label>
@@ -38,4 +38,4 @@
 <label>Token<input name="token" type="password" autocomplete="off"></label>
 <p><button type="button" class="pushBtn">Turn on push</button> <span class="pushState"></span><br><small>Push works with the app closed. iPhone: only from the Home Screen app, iOS 16.4+.</small></p>
 <menu><button value="signout" formnovalidate>Sign out</button><button value="cancel" formnovalidate>Cancel</button><button value="save">Save</button></menu></form></dialog>
-<script src="app.js?v=8"></script></body></html>
+<script src="app.js?v=9"></script></body></html>
