@@ -31,3 +31,5 @@ python3 /workspace/lorne-todos-app/scripts/log_meal.py $S/meals.json $R/meals.js
    If the push is rejected, run `git pull --rebase` and push again.
 
 Notes: the entry fields are carbsG, carbItems[{food,carbsG,source}], inflammatory[], verdict, verdictReason, loggedVia. Old manual entries have no carbs, and that's fine. The app's ✎ menu can set carbs by hand, which recomputes the verdict.
+
+Seed-oil and inflammation quick list: see INFLAMMATION.md.
