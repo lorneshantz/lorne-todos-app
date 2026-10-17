@@ -465,4 +465,12 @@ function renderFast(){const el=$('#fastLine');if(!el)return;const lm=go&&lastMea
  $('#fsYes').onclick=()=>{const rec={id:newId(),start,confirmedAt:now(),hours:hrs};commitGo(D=>{D.fasts=D.fasts||[];if(!D.fasts.some(x=>x.start===start))D.fasts.push(rec)},'Confirm fast').then(ok=>ok&&toast('Fast counted ✓'))};
  $('#fsFix').onclick=()=>{fastFix=true;renderFast()}}
 setInterval(()=>{if(view==='goals'&&!document.hidden&&!fastFix)renderFast()},60000);
+
+// ---- Talk to Mini Lorne (opens the Grok Bot app; no keys, no server) ----
+const ML_BOT='85eed863-bfe1-4171-9da4-acb062842576';
+const ML_SCHEME=`grokbot://app/v1/agent?id=${ML_BOT}`;
+const ML_INTENT=`intent://app/v1/agent?id=${ML_BOT}#Intent;scheme=grokbot;package=ai.x.grok.bot;S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=ai.x.grok.bot')};end`;
+$('#talkBtn').onclick=()=>{const t0=Date.now();let left=false;const onHide=()=>{if(document.hidden)left=true};document.addEventListener('visibilitychange',onHide);
+ location.href=/Android/i.test(navigator.userAgent)?ML_INTENT:ML_SCHEME;
+ setTimeout(()=>{document.removeEventListener('visibilitychange',onHide);if(!left&&!document.hidden)toast('Open Grok Bot and tap the call button')},1500)};
 setView(view);loadPeople();
