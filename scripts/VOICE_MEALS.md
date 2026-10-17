@@ -3,7 +3,7 @@
 Lorne says what he ate (voice call, or chat via the app's 🎙 button). Mini Lorne logs it from the shell; the app only displays it.
 
 ## Rules (goals.json `mealRules`)
-👎 if ANY of: an inflammatory trigger is present (`inflammatoryTriggers`, default `["seed oils"]`), carbs > `maxCarbsPerMealG` (30), or it is meal # > `maxMealsPerDay` (2) that America/New_York day. Otherwise 👍.
+👎 if ANY of: an inflammatory trigger is present (`inflammatoryTriggers`, default `["seed oils"]`), carbs > `maxCarbsPerMealG` (10), or it is meal # > `maxMealsPerDay` (2) that America/New_York day. Otherwise 👍.
 Seed oils: canola, soybean, corn, sunflower, safflower, cottonseed, grapeseed, "vegetable oil"; most fast-food fryer foods (McDonald's fries etc.).
 
 ## Steps
