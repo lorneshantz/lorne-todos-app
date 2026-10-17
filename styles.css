@@ -31,3 +31,5 @@ menu button{padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:
 header{gap:2px;padding-left:10px;padding-right:6px}header h1{font-size:18px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}header button{font-size:19px;padding:4px 3px;flex:none}
 .heat{max-width:126px}
 .fastline{font-size:14px;color:#444;margin:-4px 2px 10px}.fastline button{padding:4px 10px;border-radius:8px;border:1px solid #ccc;background:#fff;font-size:14px}.fastline input{font-size:14px;padding:4px}
+.mltoday{margin:4px 14px 0;font-size:14px;font-weight:600;color:#374151}.verdict{color:#374151}
+.infl{color:#b45309;font-weight:600}

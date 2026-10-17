@@ -205,21 +205,34 @@ async function commitMl(change,msg){if(!navigator.onLine){alert('Offline — cha
   if(r.ok){msha=(await r.json()).content.sha;localStorage.setItem('mcache',JSON.stringify(ml));status('Saved');return}
   if(r.status===409||r.status===422){status('Conflict — retrying');await fetchMl();continue}status('Save failed: HTTP '+r.status);return}
  status('Save failed after retries');await loadMl()}
-function renderMl(){if(!ml)return;renderOpts();const F=$('#mlAdd');if(!F.at.value)F.at.value=localDT(Date.now());
+function renderMl(){if(!ml)return;renderOpts();const F=$('#mlAdd');if(!F.at.value)F.at.value=localDT(Date.now());mlToday();
  if(!ml.entries.length){mmsg('No meals yet — add one above.');return}
  const es=[...ml.entries].sort((a,b)=>new Date(b.at)-new Date(a.at)),days=new Map();
  for(const e of es){const k=new Date(e.at).toDateString();if(!days.has(k))days.set(k,[]);days.get(k).push(e)}
  let html='';for(const [k,list] of days){html+=`<section><h2>${esc(new Date(list[0].at).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}))} · ${list.length} meal${list.length>1?'s':''}</h2>`+
-  list.map(e=>`<div class="item"><div class="body"><div class="t">${esc(e.description)}</div><div class="meta">${esc(new Date(e.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</div></div><button class="ed" data-id="${esc(e.id)}">✎</button></div>`).join('')+'</section>'}
+  list.map(e=>`<div class="item"><div class="body"><div class="t">${esc(e.description)}</div><div class="meta">${esc(new Date(e.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}${typeof e.carbsG==='number'?` · ~${esc(e.carbsG)} g carbs`:''}</div>${e.verdict||(e.inflammatory||[]).length?`<div class="meta verdict">${e.verdict==='down'?'👎':e.verdict==='up'?'👍':''}${(e.inflammatory||[]).length?` <span class="infl">🔥 ${esc(e.inflammatory.join(', '))}</span>`:''} ${esc(e.verdictReason||'')}</div>`:''}</div><button class="ed" data-id="${esc(e.id)}">✎</button></div>`).join('')+'</section>'}
  $('#mllist').innerHTML=html;$('#mllist').querySelectorAll('.ed').forEach(b=>b.onclick=()=>openMl(b.dataset.id))}
 $('#mlAdd').onsubmit=ev=>{ev.preventDefault();if(!tok())return openSettings();if(!ml)return alert('Meals not loaded yet — tap ⟳');const F=$('#mlAdd');
  const e={id:Math.random().toString(16).slice(2,10),at:new Date(F.at.value).toISOString(),description:F.description.value.trim()};if(!e.description)return;
  F.description.value='';F.at.value=localDT(Date.now());commitMl(D=>{if(!D.entries.some(x=>x.id===e.id))D.entries.push(e)},'Log meal')};
-function openMl(id){const e=ml.entries.find(x=>x.id===id);if(!e)return;mid=id;const F=$('#mlForm');F.description.value=e.description;F.at.value=localDT(e.at);$('#mledit').showModal()}
+function openMl(id){const e=ml.entries.find(x=>x.id===id);if(!e)return;mid=id;const F=$('#mlForm');F.description.value=e.description;F.at.value=localDT(e.at);F.carbs.value=typeof e.carbsG==='number'?e.carbsG:'';$('#mledit').showModal()}
+// carbs + goal verdict (same rules as scripts/log_meal.py; mealRules in goals.json)
+function mlRules(){let g=go;if(!g)try{g=JSON.parse(localStorage.getItem('gocache')||'null')}catch(x){}const r=(g&&g.mealRules)||{};return {c:r.maxCarbsPerMealG??30,m:r.maxMealsPerDay??2}}
+function mlVerdict(D,e){const R=mlRules(),t=Date.parse(e.at),k=new Date(t).toDateString(),d=k===new Date().toDateString()?'today':'that day';
+ const n=1+D.entries.filter(x=>x.id!==e.id&&new Date(x.at).toDateString()===k&&Date.parse(x.at)<t).length,c=e.carbsG,bad=[],inf=e.inflammatory||[];if(inf.length)bad.push(`contains ${inf.join(', ')} (inflammatory, hurts mobility)`);
+ if(typeof c==='number'&&c>R.c)bad.push(`~${c} g carbs is over your ${R.c} g per-meal limit`);if(n>R.m)bad.push(`meal #${n} ${d}; the goal is at most ${R.m} a day`);
+ if(bad.length){const s=bad.join('; ')+'.';e.verdict='down';e.verdictReason=s[0].toUpperCase()+s.slice(1)}
+ else{e.verdict='up';e.verdictReason=`${typeof c==='number'?`~${c} g carbs (limit ${R.c} g)`:'Carbs not checked'}, meal ${n} of ${R.m} ${d}. Supports blood sugar.`}}
+function mlToday(){const el=$('#mlToday');if(!el)return;const k=new Date().toDateString(),t=ml.entries.filter(e=>new Date(e.at).toDateString()===k);
+ const w=t.filter(e=>typeof e.carbsG==='number'),g=Math.round(w.reduce((a,e)=>a+e.carbsG,0)*10)/10;
+ el.textContent=`Today: ${t.length} meal${t.length===1?'':'s'} · ${w.length?`~${g} g carbs`:'carbs not checked'}${w.length&&w.length<t.length?` (${t.length-w.length} unchecked)`:''}`}
 $('#mledit').addEventListener('close',()=>{const v=$('#mledit').returnValue,id=mid,F=$('#mlForm');
  if(v==='delete'){if(confirm('Delete this meal?'))commitMl(D=>{D.entries=D.entries.filter(x=>x.id!==id)},'Delete meal');return}
  if(v!=='save')return;const u={description:F.description.value.trim(),at:new Date(F.at.value).toISOString()};if(!u.description)return;
- commitMl(D=>{const x=D.entries.find(y=>y.id===id);if(x)Object.assign(x,u)},'Edit meal')});
+ const cv=F.carbs.value.trim(),cn=cv===''?null:Math.round(+cv*10)/10;if(cn!==null&&!(cn>=0))return alert('Carbs must be a number of grams');
+ commitMl(D=>{const x=D.entries.find(y=>y.id===id);if(!x)return;Object.assign(x,u);const had=typeof x.carbsG==='number'?x.carbsG:null;
+  if(cn!==had){if(cn===null){delete x.carbsG;delete x.carbItems}else{x.carbsG=cn;x.carbItems=[{food:'set manually',carbsG:cn,source:'estimate'}]}}
+  if(x.carbsG!==undefined||x.verdict||(x.inflammatory||[]).length)mlVerdict(D,x)},'Edit meal')});
 
 // ---- Exercise types ----
 function renderTypes(){$('#typeList').innerHTML=ex.activityTypes.map((t,i)=>`<div class="item"><div class="body"><div class="t">${esc(t)}</div><div class="meta">${ex.entries.filter(e=>e.activity===t).length} entries</div></div><button class="ed" data-i="${i}">✎</button></div>`).join('')||'<p class="empty">No types yet.</p>';
