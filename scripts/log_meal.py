@@ -4,14 +4,14 @@ Usage:
   log_meal.py <meals.json> [more meals.json copies...] --goals <goals.json> --description "..." [--at ISO] [--item "food|grams|source"]... [--trigger "seed oils"]... [--via voice|app]
   log_meal.py ... --carbs-only   --description "..." --item ...      # report carbs + verdict, save nothing
   log_meal.py ... --update-id ID --item ...                          # attach carbs/verdict to an existing meal
-Source = URL or 'estimate'. Rules come from goals.json mealRules (defaults: maxCarbsPerMealG 30, maxMealsPerDay 2,
+Source = URL or 'estimate'. Rules come from goals.json mealRules (defaults: maxCarbsPerMealG 10, maxMealsPerDay 2,
 inflammatoryTriggers ['seed oils']). Thumbs down if any --trigger, OR carbs > max, OR meal # > max that NY day.
 Every meals.json copy is written identically (first file is the base). Commit/push the data repo yourself.
 Prints JSON {id, at, carbsG, inflammatory, verdict, verdictReason, saved}."""
 import json, sys, argparse, secrets, datetime as dt
 from zoneinfo import ZoneInfo
 NY = ZoneInfo('America/New_York')
-DEFAULT_RULES = {'maxCarbsPerMealG': 30, 'maxMealsPerDay': 2, 'inflammatoryTriggers': ['seed oils']}
+DEFAULT_RULES = {'maxCarbsPerMealG': 10, 'maxMealsPerDay': 2, 'inflammatoryTriggers': ['seed oils']}
 
 def parse_at(s):
     if not s: return dt.datetime.now(NY).replace(microsecond=0)
