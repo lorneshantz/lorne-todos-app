@@ -14,7 +14,7 @@
 <input name="at" type="datetime-local" required><button>Add</button></form><div id="exlist"></div><details id="exTypes" class="types"><summary>Manage types</summary><div id="typeList"></div><button id="addType" class="add">+ Add type</button></details></main>
 <dialog id="exedit"><form method="dialog" id="exForm"><h2>Edit entry</h2>
 <label>Activity<select name="activity" id="exEAct"></select></label><label>Minutes<input name="minutes" type="number" min="1" step="1" required></label>
-<label>When<input name="at" type="datetime-local" required></label><label>Carbs (g, optional)<input name="carbs" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 45"></label>
+<label>When<input name="at" type="datetime-local" required></label>
 <menu><button value="delete" formnovalidate>Delete</button><button value="cancel" formnovalidate>Cancel</button><button value="save">Save</button></menu></form></dialog>
 <main id="meals" hidden><form id="mlAdd" class="exadd"><div id="mlChips" class="chips"></div><input name="description" list="mlOpts" placeholder="What did you eat?" required style="flex:1 1 100%"><datalist id="mlOpts"></datalist>
 <input name="at" type="datetime-local" required><button>Add</button></form><div id="mlToday" class="mltoday"></div><div id="mllist"></div><details id="mlManage" class="types"><summary>Manage options</summary><div id="optList"></div><button id="addOpt" class="add">+ Add option</button></details></main>
