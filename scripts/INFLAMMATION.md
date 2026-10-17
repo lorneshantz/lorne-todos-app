@@ -28,3 +28,6 @@ When you can't tell, assume restaurant fried food and packaged foods have seed o
 
 ## Other big inflammation contributors
 Watch for added sugar, refined flour, processed meat, deep-fried food and alcohol. Mention them in the verdict reason, but only seed oils trigger a 👎 on their own.
+
+## Key experts
+The verdicts draw on Dr. Ken Berry, Dr. Jason Fung and Dr. Eric Berg. They help explain what is good to eat, but they never override the meal rules. A meal still gets a thumbs down for any seed oil, more than 30 g of carbs, or a third meal that day. General nutrition is the third factor you asked for, but it is not defined yet, so it does not affect the verdict.

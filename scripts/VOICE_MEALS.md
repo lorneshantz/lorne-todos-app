@@ -33,3 +33,6 @@ python3 /workspace/lorne-todos-app/scripts/log_meal.py $S/meals.json $R/meals.js
 Notes: the entry fields are carbsG, carbItems[{food,carbsG,source}], inflammatory[], verdict, verdictReason, loggedVia. Old manual entries have no carbs, and that's fine. The app's ✎ menu can set carbs by hand, which recomputes the verdict.
 
 Seed-oil and inflammation quick list: see INFLAMMATION.md.
+
+## Key experts
+The verdicts draw on Dr. Ken Berry, Dr. Jason Fung and Dr. Eric Berg. They help explain what is good to eat, but they never override the meal rules. A meal still gets a thumbs down for any seed oil, more than 30 g of carbs, or a third meal that day. General nutrition is the third factor you asked for, but it is not defined yet, so it does not affect the verdict.
