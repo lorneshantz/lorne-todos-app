@@ -1,3 +1,5 @@
+// APP_VERSION: bump here only (keep sw.js cache name todos-shell-v<APP_VERSION> and index.html ?v= in step)
+const APP_VERSION='23';
 const OWNER='lorneshantz',REPO='lorne-todos',PATH='todos.json',BRANCH='main';
 const API=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
 const $=s=>document.querySelector(s);let data=null,sha=null,editing=null;
@@ -13,7 +15,7 @@ async function fetchData(){
  if(r.status===401||r.status===403||r.status===404)throw new Error('auth');if(!r.ok)throw new Error('HTTP '+r.status);
  const j=await r.json();sha=j.sha;data=norm(JSON.parse(b64d(j.content)));localStorage.setItem('cache',JSON.stringify(data));}
 async function load(){if(!tok())return openSettings();status('Loading…');
- try{await fetchData();status('Updated '+new Date().toLocaleTimeString())}
+ try{await fetchData();status('Updated '+new Date().toLocaleTimeString()+' · v'+APP_VERSION)}
  catch(e){if(e.message==='auth'){status('Token rejected — check settings');return openSettings()}
   const c=localStorage.getItem('cache');if(c){data=norm(JSON.parse(c));status('Offline — showing last saved copy')}else status('Could not load: '+e.message)}
  render()}
@@ -68,18 +70,27 @@ async function loadPeople(){if(!tok()){pmsg('Add your GitHub key in ⚙ to load 
 async function commitPeople(change,msg){if(!navigator.onLine){alert('Offline — changes need a connection');return}
  for(let i=0;i<3;i++){change(people);renderPeople();const body={message:msg,content:b64e(JSON.stringify(people,null,2)+'\n'),branch:BRANCH};if(psha)body.sha=psha;
   const r=await fetch(PAPI,{method:'PUT',headers:{Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'},body:JSON.stringify(body)});
-  if(r.ok){psha=(await r.json()).content.sha;localStorage.setItem('pcache',JSON.stringify(people));status('Saved');return}
+  if(r.ok){psha=(await r.json()).content.sha;localStorage.setItem('pcache',JSON.stringify(people));status('Saved');return true}
   if(r.status===409||r.status===422){status('Conflict — retrying');await fetchPeople();continue}status('Save failed: HTTP '+r.status);return}
  status('Save failed after retries');await loadPeople()}
 function renderPeople(){if(!people)return;if(!people.people.length){$('#peopleNames').innerHTML='';pmsg('No people yet — tap + Add person.');return}const ps=[...people.people].map((p,i)=>({...p,i})).sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base'}));
  $('#peopleNames').innerHTML=ps.map(p=>`<option value="${esc(p.name)}">`).join('');
  $('#plist').innerHTML=ps.map(p=>`<div class="item"><div class="body"><div class="t">${esc(p.name)}</div><div class="meta">${p.email?`✉ <a href="mailto:${esc(p.email)}">${esc(p.email)}</a>`:'✉ —'}${p.cell?` · 📱 <a href="tel:${esc(p.cell)}">${esc(p.cell)}</a>`:''}</div></div><button class="ed" data-i="${p.i}">✎</button></div>`).join('')||'<p class="empty">No people yet.</p>';
  $('#plist').querySelectorAll('.ed').forEach(b=>b.onclick=()=>openPerson(+b.dataset.i))}
-function openPerson(i){pidx=i;const p=i==null?{name:'',email:'',cell:''}:people.people[i],F=$('#pForm');$('#pTitle').textContent=i==null?'Add person':'Edit person';
+function openPerson(i){pidx=i;const p=i==null?{name:'',email:'',cell:''}:people.people[i],F=$('#pForm');$('#pTitle').textContent=i==null?'Add person':'Edit person';$('#pDel').hidden=i==null;
  F.name.value=p.name||'';F.email.value=p.email||'';F.cell.value=p.cell||'';$('#pedit').showModal()}
 $('#pedit').addEventListener('close',()=>{if($('#pedit').returnValue!=='save')return;const F=$('#pForm'),old=pidx==null?null:people.people[pidx].name;
  const v={name:F.name.value.trim(),email:F.email.value.trim()||null,cell:F.cell.value.trim()||null};if(!v.name)return;
  commitPeople(P=>{const j=old==null?-1:P.people.findIndex(x=>x.name===old);if(j>=0)Object.assign(P.people[j],v);else if(!P.people.some(x=>x.name===v.name))P.people.push(v)},`${old==null?'Add':'Edit'} person ${v.name}`)});
+const sameName=(a,b)=>String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase();
+$('#pDel').onclick=async()=>{if(pidx==null||!people)return;const name=people.people[pidx].name;
+ if(!data&&tok()){try{await fetchData()}catch(e){}}
+ const mine=data?data.todos.filter(t=>sameName(t.assignee,name)):[],open=mine.filter(t=>t.status!=='complete').length;
+ const msg=`Delete ${name}? Their to-dos stay but become unassigned.`+(open?`\n\n${open} open to-do${open===1?' is':'s are'} assigned to ${name}.`:'');
+ if(!confirm(msg))return;$('#pedit').close('cancel');
+ if(!await commitPeople(P=>{P.people=P.people.filter(x=>x.name!==name)},`Delete person ${name}`))return;
+ if(mine.length)await commit(D=>{D.todos.forEach(t=>{if(sameName(t.assignee,name)){delete t.assignee;t.updated=now()}})},`Unassign to-dos from deleted person ${name}`);
+ toast(`Deleted ${name}`+(mine.length?` · ${mine.length} to-do${mine.length===1?'':'s'} unassigned`:''))};
 $('#addPerson').onclick=()=>{if(!tok())return openSettings();if(!people)return alert('People list not loaded yet — tap ⟳');openPerson(null)};
 const VIEWS={people:['#people','👥','People'],exercise:['#exercise','🏃','Exercise'],meals:['#meals','🍽','Meals'],glucose:['#glucose','🩸','Glucose'],weight:['#weight','⚖️','Weight'],goals:['#goals','🎯','Goals']};
 const BTN={exercise:'#exBtn',meals:'#mlBtn',glucose:'#glBtn',weight:'#wtBtn',goals:'#goBtn'};
