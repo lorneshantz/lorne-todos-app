@@ -296,7 +296,7 @@ $('#addOpt').onclick=()=>{if(!tok())return openSettings();if(!ml)return alert('M
 // ---- Weight (Withings; synced by GitHub Action) ----
 const W_REDIRECT='https://lorneshantz.github.io/lorne-todos-app/';
 const RAW=f=>`https://api.github.com/repos/${OWNER}/${REPO}/contents/${f}`;
-let wt=null,wtRange=localStorage.getItem('wtRange')||'month';
+let wt=null,wSt=null,wtRange=localStorage.getItem('wtRange')||'month';
 async function ghRaw(f){const r=await fetch(RAW(f)+'?ref='+BRANCH+'&t='+Date.now(),{headers:{Authorization:'Bearer '+tok(),Accept:'application/vnd.github.raw+json'},cache:'no-store'});
  if(r.status===404)return null;if(r.status===401||r.status===403)throw new Error('auth');if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 async function ghPut(f,obj,msg){const H={Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'};
@@ -309,7 +309,7 @@ async function withingsConnect(){try{if(!tok())return openSettings();let cid=nul
  cid=cid||localStorage.getItem('withingsClientId');
  if(!cid){cid=(prompt('Paste your Withings client ID (from developer.withings.com). Or wait ~15 min after adding the GitHub secrets and try again.')||'').trim();if(!cid)return;localStorage.setItem('withingsClientId',cid)}
  const st=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('wstate',st);
- location.href='https://account.withings.com/oauth2_user/authorize2?'+new URLSearchParams({response_type:'code',client_id:cid,scope:'user.metrics',redirect_uri:W_REDIRECT,state:st})}
+ location.href='https://account.withings.com/oauth2_user/authorize2?'+new URLSearchParams({response_type:'code',client_id:cid,scope:'user.metrics,user.activity',redirect_uri:W_REDIRECT,state:st})}
  catch(e){alert('Could not start Withings connect: '+e.message)}}
 document.querySelectorAll('.wConnect').forEach(b=>b.onclick=withingsConnect);
 async function withingsCallback(){const q=new URLSearchParams(location.search);if(!q.has('code')&&!q.has('error'))return;
@@ -317,20 +317,22 @@ async function withingsCallback(){const q=new URLSearchParams(location.search);i
  if(err){alert('Withings connect cancelled: '+err);return}
  if(!st||st!==localStorage.getItem('wstate')){alert('Withings connect failed: state mismatch. Tap Connect Withings again.');return}
  localStorage.removeItem('wstate');if(!tok()){alert('Add your GitHub key in ⚙ first, then tap Connect Withings again.');return}
- try{await ghPut('withings-auth.json',{code,redirect_uri:W_REDIRECT,at:now()},'Withings auth code');localStorage.setItem('wConnecting',String(Date.now()));setView('weight');status('Withings: connecting… up to ~15 min')}
+ try{await ghPut('withings-auth.json',{code,redirect_uri:W_REDIRECT,at:now()},'Withings auth code');localStorage.setItem('wConnecting',String(Date.now()));setView('weight');status('Withings: connecting… about a minute')}
  catch(e){alert('Could not save Withings connection: '+e.message)}}
 const LB=2.20462;
 async function loadWt(){if(!tok()){wmsg('Add your GitHub key in ⚙ to load weight.');return}if(!wt)wmsg('Loading weight…');
- try{wt=await ghRaw('weight-history.json');if(wt)localStorage.setItem('wcache',JSON.stringify(wt))}
+ try{[wt,wSt]=await Promise.all([ghRaw('weight-history.json'),ghRaw('steps-history.json').catch(()=>wSt)]);if(wt)localStorage.setItem('wcache',JSON.stringify(wt))}
  catch(e){const c=localStorage.getItem('wcache');if(c){wt=JSON.parse(c);status('Offline/error — showing saved weight ('+e.message+')')}
   else{wmsg(e.message==='auth'?'GitHub key was rejected. Update it in ⚙.':'Could not load weight: '+e.message+'. Tap ⟳ to retry.');return}}
  renderWt()}
 function renderWt(){const conn=+localStorage.getItem('wConnecting')||0,b=$('#wtBanner');
  if(wt&&wt.lastSync&&Date.parse(wt.lastSync)>conn&&!wt.needsReconnect)localStorage.removeItem('wConnecting');
  const connecting=localStorage.getItem('wConnecting')&&Date.now()-conn<60*60000;
- b.hidden=false;if(connecting)b.textContent='Connecting to Withings… this can take up to ~15 min.';
+ b.hidden=false;if(connecting)b.textContent='Connecting to Withings… usually about a minute. Tap ⟳ to check.';
  else if(wt&&wt.needsReconnect){b.innerHTML=`⚠ ${esc((wt.lastError&&wt.lastError.message)||'Withings needs reconnecting.')} <button type="button" class="wConnect">Reconnect Withings</button>`;b.querySelector('.wConnect').onclick=withingsConnect}
+ else if(wt&&wt.needsStepsScope){b.innerHTML='👟 One-time step: <button type="button" class="wConnect">Reconnect Withings to add steps</button>';b.querySelector('.wConnect').onclick=withingsConnect}
  else b.hidden=true;
+ {const s=GC.stepsSummary(wSt&&wSt.days,new Date());$('#wtSteps').textContent=s?`👟 Steps today ${s.today.toLocaleString()}`:''}
  const rs=(wt&&wt.readings||[]).filter(r=>r.weightKg!=null);
  if(!rs.length){wmsg(connecting?'Waiting for the first Withings sync…':!wt?'No weight data yet. Add the Withings secrets in GitHub, then tap Connect Withings below.':'No weigh-ins yet. Step on the scale and wait for the next sync.');if(wt&&wt.lastError&&!wt.needsReconnect)$('#wtInfo').textContent='⚠ '+wt.lastError.message;return}
  const c=rs.at(-1),now=Date.now(),wk=rs.filter(r=>Date.parse(r.t)>=now-7*864e5),avg=wk.reduce((s,r)=>s+r.weightKg,0)/(wk.length||1);
@@ -391,8 +393,8 @@ async function loadGo(){if(!tok()){gomsg('Add your GitHub key in ⚙ to load goa
  catch(e){const c=localStorage.getItem('gocache');if(c){go=JSON.parse(c);status('Offline/error — showing saved goals ('+e.message+')')}
   else{gomsg(e.message==='auth'?'GitHub key was rejected. Update it in ⚙.':'Could not load goals: '+e.message+'. Tap ⟳ to retry.');return}}
  renderGo();// indicators (best effort, non-blocking)
- fetchMl().catch(()=>{}).then(()=>renderFast());const [ex,wt,gl]=await Promise.all([ghRaw('exercise.json').catch(()=>null),ghRaw('weight-history.json').catch(()=>null),ghRaw('glucose.json').catch(()=>null)]);
- goX={ex:(ex&&ex.entries)||[],wt,gl};renderGo()}
+ fetchMl().catch(()=>{}).then(()=>renderFast());const [ex,wt,gl,stp]=await Promise.all([ghRaw('exercise.json').catch(()=>null),ghRaw('weight-history.json').catch(()=>null),ghRaw('glucose.json').catch(()=>null),ghRaw('steps-history.json').catch(()=>null)]);
+ goX={ex:(ex&&ex.entries)||[],wt,gl,st:stp};renderGo()}
 async function commitGo(change,msg){if(!navigator.onLine){alert('Offline — changes need a connection');return false}
  for(let i=0;i<3;i++){change(go);go.updated=now();renderGo();const body={message:msg,content:b64e(JSON.stringify(go,null,2)+'\n'),branch:BRANCH};if(gosha)body.sha=gosha;
   const r=await fetch(GOAPI,{method:'PUT',headers:H(),body:JSON.stringify(body)});
@@ -403,6 +405,8 @@ function ring(p,label){const r=22,c=2*Math.PI*r,v=Math.max(0,Math.min(1,p||0));r
 function heat(valByDay,max){const end=new Date();end.setHours(0,0,0,0);const s=GC.weekStart(end);s.setDate(s.getDate()-28);let h='<div class="heat">';
  for(let d=new Date(s),i=0;i<35;i++,d.setDate(d.getDate()+1)){const v=valByDay[GC.dayKey(d)]||0,f=d>end?-1:Math.min(1,v/(max||1));h+=`<i style="background:${f<0?'transparent':f===0?'#e5e7eb':`rgba(16,185,129,${0.3+0.7*f})`}" title="${GC.dayKey(d)}"></i>`}return h+'</div>'}
 const LBS=2.20462;
+function stepsLine(g){if(!g.stepsIndicator)return '';const s=GC.stepsSummary(goX.st&&goX.st.days,new Date());if(!s)return '';const t=+g.targetStepsPerDay||7000,n=x=>Math.round(x).toLocaleString();
+ return `<div class="meta steps">Steps: today ${n(s.today)} · 7-day avg ${n(s.avg7)} / ${n(t)}${s.avg7>=t?' ✓':''}</div>`}
 function goalView(g){const nowD=new Date(),[s,e]=GC.periodBounds(g.period,nowD);
  if(g.indicator==='weight-history.json'){const m=(curQ().metric)||{start:225,target:200};const rs=((goX.wt&&goX.wt.readings)||[]).filter(r=>r.weightKg!=null);
   const by={};rs.forEach(r=>by[GC.dayKey(r.t)]=1);if(!rs.length)return {ring:ring(0,'—'),line:'No weigh-ins yet',heat:heat(by,1)};
@@ -422,7 +426,7 @@ function renderGo(){if(!go)return;const q=curQ();if(!q){gomsg('No current quarte
  $('#goHead').innerHTML=`<div class="one">🎯 ${esc(q.theOneThing)}</div><div class="meta">${esc(q.why||'')}${st?` · 🔥 ${st}-day streak`:''}</div>`;
  const tm=localStorage.getItem('goTimers')?JSON.parse(localStorage.getItem('goTimers')):{};
  $('#goCards').innerHTML=(q.goals||[]).map(g=>{const v=goalView(g),running=tm[g.id];
-  return `<div class="gcard" data-g="${esc(g.id)}"><div class="grow">${v.ring}<div class="body"><div class="t">${esc(g.name)} <small class="meta">· ${esc(g.period)}${g.targetMinutes?` · ${g.targetMinutes} min`:''}</small></div><div class="meta">${esc(v.line)}</div></div>${v.minutes?'<button class="ed gtgt" title="Target">✎</button>':''}</div>
+  return `<div class="gcard" data-g="${esc(g.id)}"><div class="grow">${v.ring}<div class="body"><div class="t">${esc(g.name)} <small class="meta">· ${esc(g.period)}${g.targetMinutes?` · ${g.targetMinutes} min`:''}</small></div><div class="meta">${esc(v.line)}</div>${stepsLine(g)}</div>${v.minutes?'<button class="ed gtgt" title="Target">✎</button>':''}</div>
   ${v.minutes?`<div class="chips"><button class="chip" data-m="15">15</button><button class="chip" data-m="30">30</button><button class="chip" data-m="60">60</button><button class="chip tmr${running?' on':''}">${running?'■ Stop':'▶ Start'}</button></div>`:''}${v.heat}</div>`}).join('');
  $('#goCards').querySelectorAll('.gcard').forEach(c=>{const id=c.dataset.g;c.querySelectorAll('.chip[data-m]').forEach(b=>b.onclick=()=>logSession(id,+b.dataset.m));
   const t=c.querySelector('.tmr');if(t)t.onclick=()=>toggleTimer(id);const e=c.querySelector('.gtgt');if(e)e.onclick=()=>editTarget(id)});

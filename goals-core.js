@@ -33,5 +33,8 @@ function weekStreak(byDay,target,now){let ws=weekStart(now),n=0;const cur=sumRan
 function behindGoals(gdata,exercise,now){const q=(gdata.quarters||[]).find(x=>x.status==='current');if(!q)return [];const out=[];
  for(const g of q.goals||[]){if(!g.targetMinutes)continue;const [s,e]=periodBounds(g.period,now);const done=sumRange(minutesByDay(g.id,gdata.sessions,exercise),s,e);
   const p=pace(done,g.targetMinutes,s,e,now);if(!p.onPace&&done<g.targetMinutes)out.push({goal:g,done,p})}return out}
-const api={DAY,weekStart,quarterBounds,periodBounds,pace,paceLine,parsePhrase,dayKey,minutesByDay,sumRange,dayStreak,weekStreak,behindGoals};
+// steps-history days -> {today, avg7} (7 local days incl. today, days with data only); null if no data in that window
+function stepsSummary(days,now){if(!days||!days.length)return null;const by={};for(const d of days)by[d.date]=+d.steps||0;const d=new Date(now);d.setHours(12,0,0,0);let sum=0,n=0;
+ for(let i=0;i<7;i++){const k=dayKey(d);if(k in by){sum+=by[k];n++}d.setDate(d.getDate()-1)}if(!n)return null;return {today:by[dayKey(now)]||0,avg7:sum/n}}
+const api={DAY,stepsSummary,weekStart,quarterBounds,periodBounds,pace,paceLine,parsePhrase,dayKey,minutesByDay,sumRange,dayStreak,weekStreak,behindGoals};
 if(typeof module!=='undefined')module.exports=api;else root.GC=api})(typeof window!=='undefined'?window:globalThis);
