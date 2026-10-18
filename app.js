@@ -82,12 +82,13 @@ $('#pedit').addEventListener('close',()=>{if($('#pedit').returnValue!=='save')re
  commitPeople(P=>{const j=old==null?-1:P.people.findIndex(x=>x.name===old);if(j>=0)Object.assign(P.people[j],v);else if(!P.people.some(x=>x.name===v.name))P.people.push(v)},`${old==null?'Add':'Edit'} person ${v.name}`)});
 $('#addPerson').onclick=()=>{if(!tok())return openSettings();if(!people)return alert('People list not loaded yet — tap ⟳');openPerson(null)};
 const VIEWS={people:['#people','👥','People'],exercise:['#exercise','🏃','Exercise'],meals:['#meals','🍽','Meals'],glucose:['#glucose','🩸','Glucose'],weight:['#weight','⚖️','Weight'],goals:['#goals','🎯','Goals']};
-const BTN={people:'#tabBtn',exercise:'#exBtn',meals:'#mlBtn',glucose:'#glBtn',weight:'#wtBtn',goals:'#goBtn'};
+const BTN={exercise:'#exBtn',meals:'#mlBtn',glucose:'#glBtn',weight:'#wtBtn',goals:'#goBtn'};
 function setView(v){if(v!=='todos'&&!VIEWS[v])v='todos';view=v;localStorage.setItem('view',v);
- for(const k in VIEWS){$(VIEWS[k][0]).hidden=k!==v;$(BTN[k]).textContent=k===v?'☑':VIEWS[k][1]}
+ for(const k in VIEWS){$(VIEWS[k][0]).hidden=k!==v;if(BTN[k])$(BTN[k]).textContent=k===v?'☑':VIEWS[k][1]}
  $('#lists').hidden=v!=='todos';$('#bar').hidden=v!=='todos';$('#ttl').textContent=v==='todos'?'To-Dos':VIEWS[v][2];
  if(v==='people')loadPeople();if(v==='exercise')loadEx();if(v==='meals')loadMl();if(v==='glucose')loadGl();if(v==='weight')loadWt();if(v==='goals')loadGo()}
 for(const k in BTN)$(BTN[k]).onclick=()=>setView(view===k?'todos':k);
+$('#peopleBtn').onclick=()=>{$('#settings').close('cancel');setView('people')};$('#pBack').onclick=()=>setView('todos');
 $('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():view==='meals'?loadMl():view==='glucose'?loadGl():view==='weight'?loadWt():view==='goals'?loadGo():load();
 
 
