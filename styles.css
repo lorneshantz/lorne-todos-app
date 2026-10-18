@@ -76,3 +76,4 @@ svg line{stroke:#262626}.ring circle:first-child{stroke:#262626}.ring text{fill:
 
 body::after{content:"";position:fixed;left:0;right:0;bottom:0;height:max(env(safe-area-inset-bottom),0px);background:#1f2937;z-index:9999;pointer-events:none}
 body{padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
+html{background:#1f2937}body{min-height:100dvh}
