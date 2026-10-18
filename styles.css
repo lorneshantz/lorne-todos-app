@@ -72,3 +72,4 @@ svg line{stroke:#262626}.ring circle:first-child{stroke:#262626}.ring text{fill:
 .mbtns{display:flex;gap:6px;margin-top:6px}dialog label.mbtn,.mbtn{flex:1;display:flex;align-items:center;justify-content:center;min-height:44px;margin:0;padding:0 4px;border:1px solid #ccc;border-radius:8px;background:#fff;color:inherit;font-size:0.9375rem;white-space:nowrap}
 .mbtn.rec{background:#dc2626;color:#fff;border-color:#dc2626}#mPrev{margin-top:6px}
 @media (prefers-color-scheme:dark){.mbtn{background:#111;color:#e5e7eb;border-color:#374151}.mbtn.rec{background:#dc2626;color:#fff}.mthumb{background:#ffffff11}}
+.byw{color:#1a7f37;font-weight:600}

@@ -1,0 +1,7 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Mark done</title><style>body{font:1.2rem system-ui,sans-serif;text-align:center;padding:3rem 1rem;color-scheme:light dark}a{display:inline-block;margin-top:1rem;padding:1rem 2rem;border-radius:12px;background:#1a7f37;color:#fff;text-decoration:none;font-weight:600}</style></head>
+<body><p id="m">Opening your messages…</p><a id="b" href="#">✅ Text DONE</a><p><small>Then just tap send.</small></p>
+<script>// Only a task code comes in (?c=W7). Opens a prefilled "DONE W7" text to Lorne's HighLevel number; the to-do Action reads it and closes the task.
+const c=(new URLSearchParams(location.search).get('c')||'').toUpperCase(),b=document.getElementById('b');
+if(/^[A-Z]\d{1,4}$/.test(c)){const u='sms:+19026098652?body='+encodeURIComponent('DONE '+c);b.href=u;b.textContent='✅ Text DONE '+c;location.href=u}
+else{document.getElementById('m').textContent='This link is missing its code.';b.remove()}</script></body></html>

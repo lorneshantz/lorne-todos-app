@@ -1,5 +1,5 @@
 // APP_VERSION: bump here only (keep sw.js cache name todos-shell-v<APP_VERSION> and index.html ?v= in step)
-const APP_VERSION='26';
+const APP_VERSION='27';
 const OWNER='lorneshantz',REPO='lorne-todos',PATH='todos.json',BRANCH='main';
 const API=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
 const $=s=>document.querySelector(s);let data=null,sha=null,editing=null;
@@ -38,11 +38,11 @@ var render=function(){const m=$('#lists');m.innerHTML='';if(!data)return;
   if(!items.length){const e=document.createElement('p');e.className='empty';e.textContent='No items';s.appendChild(e)}
   for(const t of items){const d=document.createElement('div');d.className='item'+(t.status==='complete'?' done':'');
    d.innerHTML=`<button class="chk">${t.status==='complete'?'✓':''}</button><div class="body"><div class="t">${t.recurrence?'<span title="Repeats">🔁</span> ':''}${esc(t.title)}</div>
-   <div class="meta">${t.assignee?'👤 '+esc(t.assignee)+' ':''}${(t.media||[]).length?`<span title="Photos/videos">📎 ${t.media.length}</span> `:''}${t.due?`<span class="due${t.status!=='complete'&&dueAt(t)<Date.now()?' late':''}">📅 ${esc(fmtDue(t))}</span>`:''}</div>${t.steps&&t.steps.length?'<ul>'+t.steps.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}</div>${isOverdueRec(t)?'<button class="cu" title="Bring up to date">⏭</button>':''}<button class="ed">✎</button>`;
+   <div class="meta">${t.assignee?'👤 '+esc(t.assignee)+' ':''}${t.status==='complete'&&t.completedBy?'<span class="byw">✅ by '+esc(t.completedBy)+'</span> ':''}${t.status!=='complete'&&t.sendError?'<span class="late">⚠ not sent</span> ':t.status!=='complete'&&t.sentAt?'<span title="Sent; waiting for DONE">📤 '+esc(t.code)+'</span> ':''}${(t.media||[]).length?`<span title="Photos/videos">📎 ${t.media.length}</span> `:''}${t.due?`<span class="due${t.status!=='complete'&&dueAt(t)<Date.now()?' late':''}">📅 ${esc(fmtDue(t))}</span>`:''}</div>${t.steps&&t.steps.length?'<ul>'+t.steps.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}</div>${isOverdueRec(t)?'<button class="cu" title="Bring up to date">⏭</button>':''}<button class="ed">✎</button>`;
    d.querySelector('.chk').onclick=()=>{const nid=newId();commit(D=>{const x=D.todos.find(y=>y.id===t.id);if(x){x.status=x.status==='complete'?'open':'complete';x.updated=now();if(x.status==='complete')spawnNext(D,x,nid)}},`Toggle ${t.title}`)}
    d.querySelector('.ed').onclick=()=>openEdit(t);{const cb=d.querySelector('.cu');if(cb)cb.onclick=()=>catchUpItem(t.id)}s.appendChild(d)}m.appendChild(s)}
  if(!any)m.innerHTML='<p style="padding:14px;color:#666">Nothing to show.</p>'}
-function openEdit(t){editing=t.id;const F=$('#editForm');F.title.value=t.title;F.list.value=t.list;F.assignee.value=t.assignee||'';F.steps.value=(t.steps||[]).join('\n');F.status.value=t.status;F.due.value=t.due||'';F.dueTime.value=t.due?(t.dueTime||''):'';F.dueTime.disabled=!t.due;const rc=t.recurrence||{};F.rtype.value=rc.type||'';F.rint.value=rc.interval||1;F.rwd.value=String(rc.weekday??(t.due?pd(t.due).getDay():new Date().getDay()));F.rmd.value=rc.monthDay||(t.due?pd(t.due).getDate():new Date().getDate());rUI();{const od=isOverdueRec(t);$('#catchL').hidden=!od;if(od){const c=catchUpCalc(t.recurrence,t.due);$('#catchInfo').textContent=`missed ${c.skipped}, next ${c.next}`}}$('#edit').showModal();if(!mBusy)mmsgEl('');showMedia()}
+function openEdit(t){editing=t.id;const F=$('#editForm');F.title.value=t.title;F.list.value=t.list;F.assignee.value=t.assignee||'';F.steps.value=(t.steps||[]).join('\n');F.status.value=t.status;F.due.value=t.due||'';F.dueTime.value=t.due?(t.dueTime||''):'';F.dueTime.disabled=!t.due;const rc=t.recurrence||{};F.rtype.value=rc.type||'';F.rint.value=rc.interval||1;F.rwd.value=String(rc.weekday??(t.due?pd(t.due).getDay():new Date().getDay()));F.rmd.value=rc.monthDay||(t.due?pd(t.due).getDate():new Date().getDate());rUI();{const od=isOverdueRec(t);$('#catchL').hidden=!od;if(od){const c=catchUpCalc(t.recurrence,t.due);$('#catchInfo').textContent=`missed ${c.skipped}, next ${c.next}`}}sendUI(t);$('#edit').showModal();if(!mBusy)mmsgEl('');showMedia()}
 $('#edit').addEventListener('close',()=>{if($('#edit').returnValue!=='save')return;const F=$('#editForm'),id=editing;
  const v={title:F.title.value.trim(),list:F.list.value.trim()||'Inbox',assignee:F.assignee.value.trim(),steps:F.steps.value.split('\n').map(s=>s.trim()).filter(Boolean),status:F.status.value,due:F.due.value||'',dueTime:F.due.value?(F.dueTime.value||''):''};const rec=readRec(F),nid=newId();
  commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x)return;const wasDone=x.status==='complete';if(rec)x.recurrence=rec;else delete x.recurrence;const oldDue=x.due,oldTime=x.dueTime;Object.assign(x,v,{updated:now()});if(!x.assignee)delete x.assignee;if(!x.due)delete x.due;if(!x.dueTime||!x.due)delete x.dueTime;if(x.due!==oldDue||x.dueTime!==oldTime)unmark(x.id);if(!D.lists.includes(v.list))D.lists.push(v.list);if(!wasDone&&x.status==='complete')spawnNext(D,x,nid)},`Edit ${v.title}`)});
@@ -420,6 +420,18 @@ function catchUpItem(id){const nid=newId();if($('#edit').open)$('#edit').close('
  commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x||!isOverdueRec(x))return;const c=catchUpCalc(x.recurrence,x.due);
   x.status='complete';x.updated=now();x.skippedCount=c.skipped;spawnNext(D,x,nid);const n=D.todos.find(y=>y.id===nid);if(n)n.due=c.next},'Bring up to date');}
 $('#catchBtn').onclick=()=>catchUpItem(editing);
+// ---- Send to assignee (close-the-loop). Only on Lorne's tap: appends to outbox.json in the private repo; its assign-loop Action texts it via HighLevel (token never in this app). ----
+function sendUI(t){$('#sendL').hidden=!t.assignee||t.status==='complete';$('#sendWho').textContent=t.assignee||'';$('#sendBtn').firstChild.textContent=t.sentAt?'📤 Resend to ':'📤 Send to ';
+ $('#sendInfo').textContent=t.sendError?'⚠ '+t.sendError:t.sentAt?`sent ${new Date(t.sentAt).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · code ${t.code}`:'they tap the link (or reply DONE) to close it'}
+$('#sendBtn').onclick=async()=>{const t=data&&data.todos.find(x=>x.id===editing);if(!t)return;
+ if(!sameName($('#editForm').assignee.value,t.assignee))return alert('Save the assignee first, then send.');
+ if(!navigator.onLine)return alert('Offline — sending needs a connection');if(!confirm(`Text “${t.title}” to ${t.assignee}?`))return;
+ const H={Authorization:'Bearer '+tok(),Accept:'application/vnd.github+json'};$('#sendInfo').textContent='queuing…';
+ try{for(let i=0;i<3;i++){let sha=null,o={queue:[]};const g=await fetch(RAW('outbox.json')+'?ref='+BRANCH+'&t='+Date.now(),{headers:H,cache:'no-store'});
+   if(g.ok){const j=await g.json();sha=j.sha;o=JSON.parse(b64d(j.content))}else if(g.status!==404)throw new Error('HTTP '+g.status);
+   (o.queue=o.queue||[]).push({id:newId(),todoId:t.id,requestedAt:now(),status:'pending'});const body={message:`Send to ${t.assignee}: ${t.title}`,content:b64e(JSON.stringify(o,null,2)+'\n'),branch:BRANCH};if(sha)body.sha=sha;
+   const r=await fetch(RAW('outbox.json'),{method:'PUT',headers:H,body:JSON.stringify(body)});if(r.ok){$('#sendInfo').textContent='queued — text goes out in about a minute';status('Queued for '+t.assignee);return}
+   if(r.status!==409&&r.status!==422)throw new Error('HTTP '+r.status)}throw new Error('conflict, try again')}catch(e){$('#sendInfo').textContent='⚠ '+e.message}};
 
 // ---- Goals ----
 const GOAPI=RAW('goals.json');let go=null,gosha=null,goX={ex:[],wt:null,gl:null},showReview=new Date().getDay()===0;

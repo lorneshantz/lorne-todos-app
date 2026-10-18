@@ -16,6 +16,11 @@ function nyToUtc(date,time){const [y,m,d]=date.split('-').map(Number),[hh,mm]=ti
    catch(e){if(e.statusCode===404||e.statusCode===410)dead.add(s.endpoint);else console.log('push error',e.statusCode||e.message)}}
   if(ok)pushed[key]=new Date().toISOString();console.log('sent',t.id,ok)}
  if(dead.size){subsF.subscriptions=subs.filter(s=>!dead.has(s.endpoint));wr('subscriptions.json',subsF);console.log('dropped',dead.size)}
+ // Assignee close-the-loop: one push per to-do an assignee marked done by text (completedBy set by lorne-todos assign-loop)
+ for(const t of todos.todos||[]){if(t.status!=='complete'||!t.completedBy||!t.completedAt)continue;const key='done|'+t.id;if(pushed[key])continue;
+  if(now-Date.parse(t.completedAt)>24*3600e3){pushed[key]='skipped-stale';continue}if(!subs.length)continue;let ok=0;
+  for(const s of subs){if(dead.has(s.endpoint))continue;try{await webpush.sendNotification(s,JSON.stringify({title:'✅ '+t.completedBy+' marked done',body:t.title,tag:'done-'+t.id}));ok++}catch(e){console.log('done push error',e.statusCode||e.message)}}
+  if(ok)pushed[key]=new Date().toISOString();console.log('done push',ok)}
  try{await goalsNudge(subs.filter(s=>!dead.has(s.endpoint)),pushed)}catch(e){console.log('nudge error',e.message)}
  wr('pushed.json',pushed)})().catch(e=>{console.error(e);process.exit(1)});
 
