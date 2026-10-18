@@ -1,5 +1,5 @@
 // APP_VERSION: bump here only (keep sw.js cache name todos-shell-v<APP_VERSION> and index.html ?v= in step)
-const APP_VERSION='29';
+const APP_VERSION='30';
 const OWNER='lorneshantz',REPO='lorne-todos',PATH='todos.json',BRANCH='main';
 const API=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
 const $=s=>document.querySelector(s);let data=null,sha=null,editing=null;
