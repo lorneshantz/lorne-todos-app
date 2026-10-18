@@ -1,5 +1,5 @@
 // APP_VERSION: bump here only (keep sw.js cache name todos-shell-v<APP_VERSION> and index.html ?v= in step)
-const APP_VERSION='23';
+const APP_VERSION='24';
 const OWNER='lorneshantz',REPO='lorne-todos',PATH='todos.json',BRANCH='main';
 const API=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
 const $=s=>document.querySelector(s);let data=null,sha=null,editing=null;
@@ -94,10 +94,13 @@ $('#pDel').onclick=async()=>{if(pidx==null||!people)return;const name=people.peo
 $('#addPerson').onclick=()=>{if(!tok())return openSettings();if(!people)return alert('People list not loaded yet — tap ⟳');openPerson(null)};
 const VIEWS={people:['#people','👥','People'],exercise:['#exercise','🏃','Exercise'],meals:['#meals','🍽','Meals'],glucose:['#glucose','🩸','Glucose'],weight:['#weight','⚖️','Weight'],goals:['#goals','🎯','Goals']};
 const BTN={exercise:'#exBtn',meals:'#mlBtn',glucose:'#glBtn',weight:'#wtBtn',goals:'#goBtn'};
+const FRESH=2*60000,loadedAt={};
 function setView(v){if(v!=='todos'&&!VIEWS[v])v='todos';view=v;localStorage.setItem('view',v);
  for(const k in VIEWS){$(VIEWS[k][0]).hidden=k!==v;if(BTN[k])$(BTN[k]).textContent=k===v?'☑':VIEWS[k][1]}
  $('#lists').hidden=v!=='todos';$('#bar').hidden=v!=='todos';$('#ttl').textContent=v==='todos'?'To-Dos':VIEWS[v][2];
- if(v==='people')loadPeople();if(v==='exercise')loadEx();if(v==='meals')loadMl();if(v==='glucose')loadGl();if(v==='weight')loadWt();if(v==='goals')loadGo()}
+ // v24: reuse what's already loaded for 2 min instead of refetching from GitHub on every tab tap (⟳ always refetches)
+ const T={people:[loadPeople,renderPeople,()=>people],exercise:[loadEx,renderEx,()=>ex],meals:[loadMl,renderMl,()=>ml],glucose:[loadGl,renderGl,()=>gl],weight:[loadWt,renderWt,()=>wt],goals:[loadGo,renderGo,()=>go]}[v];
+ if(T){if(T[2]()&&Date.now()-(loadedAt[v]||0)<FRESH)T[1]();else{loadedAt[v]=Date.now();T[0]()}}}
 for(const k in BTN)$(BTN[k]).onclick=()=>setView(view===k?'todos':k);
 $('#peopleBtn').onclick=()=>{$('#settings').close('cancel');setView('people')};$('#pBack').onclick=()=>setView('todos');
 $('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():view==='meals'?loadMl():view==='glucose'?loadGl():view==='weight'?loadWt():view==='goals'?loadGo():load();
@@ -120,7 +123,7 @@ function notifUI(){const b=$('#notif');if(!('Notification' in window)){b.hidden=
  const p=Notification.permission;b.hidden=p==='granted'&&localStorage.getItem('pushOn')==='1';$('#notifBtn').hidden=p==='denied';
  $('#notifMsg').textContent=p==='denied'?'Reminders are blocked. Turn on notifications for this app in your phone Settings (iPhone: Settings › Notifications › To-Dos; Android: long-press icon › App info › Notifications).':'Get a reminder when a to-do is due.'}
 $('#notifBtn').onclick=async()=>{await Notification.requestPermission();notifUI();checkDue()};
-setInterval(()=>{checkDue();},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){checkDue();render()}});
+setInterval(()=>{if(document.hidden&&localStorage.getItem('pushOn')==='1')return;checkDue()},60000);// v24: in background, push covers reminders, so skip the checkdocument.addEventListener('visibilitychange',()=>{if(!document.hidden){checkDue();render()}});
 const _render=render;render=function(){_render();checkDue()};notifUI();
 navigator.serviceWorker&&navigator.serviceWorker.ready.then(async r=>{try{if('periodicSync' in r&&(await navigator.permissions.query({name:'periodic-background-sync'})).state==='granted')await r.periodicSync.register('due-check',{minInterval:15*60*1000})}catch(e){}});
 $('#editForm').due.addEventListener('input',e=>{const T=$('#editForm').dueTime;T.disabled=!e.target.value;if(!e.target.value)T.value=''});
@@ -290,7 +293,7 @@ function renderGl(){if(!gl)return;const c=gl.current||(gl.readings||[]).slice(-1
  if(gl.lastError)$('#glInfo').textContent+=` · ⚠ ${gl.lastError.message}`;
  $('#glChart').innerHTML=s+'</svg>'}
 document.querySelectorAll('#glucose .seg button').forEach(b=>b.onclick=()=>{glRange=b.dataset.r;localStorage.setItem('glRange',glRange);renderGl()});
-setInterval(()=>{if(view==='glucose'&&!document.hidden)loadGl()},5*60000);
+setInterval(()=>{if(view==='glucose'&&!document.hidden){loadedAt.glucose=Date.now();loadGl()}},5*60000);
 
 // ---- Meal options ----
 function renderOpts(){const o=ml.mealOptions;
@@ -503,3 +506,5 @@ $('#talkBtn').onclick=()=>{const t0=Date.now();let left=false;const onHide=()=>{
  location.href=/Android/i.test(navigator.userAgent)?ML_INTENT:ML_SCHEME;
  setTimeout(()=>{document.removeEventListener('visibilitychange',onHide);if(!left&&!document.hidden)toast('Open Grok Bot and tap the call button')},1500)};
 setView(view);loadPeople();
+// v24: timers above skip work while hidden; catch up when the app comes back to the screen
+document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(view==='glucose'&&Date.now()-(loadedAt.glucose||0)>5*60000){loadedAt.glucose=Date.now();loadGl()}if(view==='goals'&&go&&!fastFix)renderFast()});
