@@ -1,5 +1,5 @@
 // APP_VERSION: bump here only (keep sw.js cache name todos-shell-v<APP_VERSION> and index.html ?v= in step)
-const APP_VERSION='28';
+const APP_VERSION='29';
 const OWNER='lorneshantz',REPO='lorne-todos',PATH='todos.json',BRANCH='main';
 const API=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
 const $=s=>document.querySelector(s);let data=null,sha=null,editing=null;
@@ -49,7 +49,7 @@ $('#edit').addEventListener('close',()=>{if($('#edit').returnValue!=='save')retu
 function openSettings(){$('#setForm').token.value='';$('#settings').showModal()}
 $('#settings').addEventListener('close',()=>{const v=$('#settings').returnValue;
  if(v==='save'){const t=$('#setForm').token.value.trim();{const w=$('#setForm').wcid.value.trim();if(w)localStorage.setItem('withingsClientId',w)}if(t){localStorage.setItem('gh_token',t);load();people=null;loadPeople()}}
- if(v==='signout'){localStorage.removeItem('gh_token');localStorage.removeItem('cache');localStorage.removeItem('pcache');people=null;pmsg('Add your GitHub key in ⚙ to load people.');data=null;render();status('Signed out')}});
+ if(v==='signout'){if(!confirm('Remove your GitHub key from this phone? The app won\'t load your to-dos until you paste a key in ⚙ again.'))return;localStorage.removeItem('gh_token');localStorage.removeItem('cache');localStorage.removeItem('pcache');people=null;pmsg('Add your GitHub key in ⚙ to load people.');data=null;render();status('Key removed — paste it in ⚙ to reload')}});
 $('#settingsBtn').onclick=openSettings;$('#refresh').onclick=load;$('#filter').oninput=render;
 $('#showDone').checked=localStorage.getItem('showDone')==='1';$('#showDone').onchange=e=>{localStorage.setItem('showDone',e.target.checked?'1':'0');render()};
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{if(!r)return;r.update();document.addEventListener('visibilitychange',()=>{if(!document.hidden)r.update()})});
