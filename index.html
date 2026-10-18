@@ -3,12 +3,13 @@
 <meta name="theme-color" content="#1f2937" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)"><meta name="color-scheme" content="light dark"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Lorne To-Dos</title><link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css?v=24"></head>
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css?v=25"></head>
 <body><header><h1 id="ttl">To-Dos</h1><button id="talkBtn" title="Talk to Mini Lorne" aria-label="Talk to Mini Lorne">🎙</button><button id="exBtn" title="Exercise">🏃</button><button id="mlBtn" title="Meals">🍽</button><button id="glBtn" title="Glucose">🩸</button><button id="wtBtn" title="Weight">⚖️</button><button id="goBtn" title="Goals">🎯</button><button id="refresh" title="Refresh">⟳</button><button id="settingsBtn" title="Settings">⚙</button></header>
 <div id="bar"><input id="filter" placeholder="Filter by assignee" list="assignees"><datalist id="assignees"></datalist>
 <label><input type="checkbox" id="showDone"> Show completed</label></div>
 <div id="notif" hidden><span id="notifMsg"></span> <button id="notifBtn">Enable reminders</button> <button class="pushBtn">Turn on push</button> <span class="pushState"></span></div><div id="status"></div><main id="lists"></main>
 <main id="people" hidden><p><button type="button" id="pBack" class="add">← Back to to-dos</button> <button id="addPerson" class="add">+ Add person</button></p><div id="plist"></div></main>
+<main id="rulebook" hidden><p><button type="button" id="rbBack" class="add">← Back to to-dos</button></p><article id="rbdoc" class="rbdoc"></article></main>
 <main id="exercise" hidden><form id="exAdd" class="exadd"><select name="activity" id="exAct"></select>
 <input name="minutes" type="number" min="1" step="1" inputmode="numeric" placeholder="Min" required>
 <input name="at" type="datetime-local" required><button>Add</button></form><div id="exlist"></div><details id="exTypes" class="types"><summary>Manage types</summary><div id="typeList"></div><button id="addType" class="add">+ Add type</button></details></main>
@@ -58,9 +59,9 @@
 <p id="catchL" hidden><button type="button" id="catchBtn">⏭ Bring up to date</button> <small id="catchInfo"></small></p>
 <label>Status<select name="status"><option>open</option><option>complete</option></select></label>
 <menu><button value="cancel" formnovalidate>Cancel</button><button value="save" id="saveBtn">Save</button></menu></form></dialog>
-<dialog id="settings"><form method="dialog" id="setForm"><h2>Settings</h2><p><button type="button" id="peopleBtn" class="add">👥 People (assignees)</button><br><small>Add or edit the people you assign to-dos to.</small></p><h3>GitHub access</h3>
+<dialog id="settings"><form method="dialog" id="setForm"><h2>Settings</h2><p><button type="button" id="peopleBtn" class="add">👥 People (assignees)</button><br><small>Add or edit the people you assign to-dos to.</small></p><p><button type="button" id="rulebookBtn" class="add">📖 Health rulebook</button><br><small>Why and how I track: goals, check-in, exercise, glucose safety, meals, data.</small></p><h3>GitHub access</h3>
 <p>Paste a fine-grained token with Contents read/write on <b>lorneshantz/lorne-todos</b> only. Stored only on this device.</p>
 <label>Token<input name="token" type="password" autocomplete="off"></label>
 <p><button type="button" class="pushBtn">Turn on push</button> <button type="button" class="pushReBtn">Re-register push</button><br><span class="pushState"></span><br><label>Withings client ID (only if asked)<input name="wcid" autocomplete="off"></label><button type="button" class="wConnect">Connect Withings</button><br><small>Push works with the app closed. iPhone: only from the Home Screen app, iOS 16.4+.</small></p>
 <menu><button value="signout" formnovalidate>Sign out</button><button value="cancel" formnovalidate>Cancel</button><button value="save">Save</button></menu></form></dialog>
-<script src="goals-core.js?v=24"></script><script src="app.js?v=24"></script></body></html>
+<script src="goals-core.js?v=25"></script><script src="app.js?v=25"></script></body></html>

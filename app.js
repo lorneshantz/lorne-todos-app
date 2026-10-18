@@ -1,5 +1,5 @@
 // APP_VERSION: bump here only (keep sw.js cache name todos-shell-v<APP_VERSION> and index.html ?v= in step)
-const APP_VERSION='24';
+const APP_VERSION='25';
 const OWNER='lorneshantz',REPO='lorne-todos',PATH='todos.json',BRANCH='main';
 const API=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
 const $=s=>document.querySelector(s);let data=null,sha=null,editing=null;
@@ -92,18 +92,18 @@ $('#pDel').onclick=async()=>{if(pidx==null||!people)return;const name=people.peo
  if(mine.length)await commit(D=>{D.todos.forEach(t=>{if(sameName(t.assignee,name)){delete t.assignee;t.updated=now()}})},`Unassign to-dos from deleted person ${name}`);
  toast(`Deleted ${name}`+(mine.length?` · ${mine.length} to-do${mine.length===1?'':'s'} unassigned`:''))};
 $('#addPerson').onclick=()=>{if(!tok())return openSettings();if(!people)return alert('People list not loaded yet — tap ⟳');openPerson(null)};
-const VIEWS={people:['#people','👥','People'],exercise:['#exercise','🏃','Exercise'],meals:['#meals','🍽','Meals'],glucose:['#glucose','🩸','Glucose'],weight:['#weight','⚖️','Weight'],goals:['#goals','🎯','Goals']};
+const VIEWS={people:['#people','👥','People'],exercise:['#exercise','🏃','Exercise'],meals:['#meals','🍽','Meals'],glucose:['#glucose','🩸','Glucose'],weight:['#weight','⚖️','Weight'],goals:['#goals','🎯','Goals'],rulebook:['#rulebook','📖','Health rulebook']};
 const BTN={exercise:'#exBtn',meals:'#mlBtn',glucose:'#glBtn',weight:'#wtBtn',goals:'#goBtn'};
 const FRESH=2*60000,loadedAt={};
 function setView(v){if(v!=='todos'&&!VIEWS[v])v='todos';view=v;localStorage.setItem('view',v);
  for(const k in VIEWS){$(VIEWS[k][0]).hidden=k!==v;if(BTN[k])$(BTN[k]).textContent=k===v?'☑':VIEWS[k][1]}
  $('#lists').hidden=v!=='todos';$('#bar').hidden=v!=='todos';$('#ttl').textContent=v==='todos'?'To-Dos':VIEWS[v][2];
  // v24: reuse what's already loaded for 2 min instead of refetching from GitHub on every tab tap (⟳ always refetches)
- const T={people:[loadPeople,renderPeople,()=>people],exercise:[loadEx,renderEx,()=>ex],meals:[loadMl,renderMl,()=>ml],glucose:[loadGl,renderGl,()=>gl],weight:[loadWt,renderWt,()=>wt],goals:[loadGo,renderGo,()=>go]}[v];
+ const T={people:[loadPeople,renderPeople,()=>people],exercise:[loadEx,renderEx,()=>ex],meals:[loadMl,renderMl,()=>ml],glucose:[loadGl,renderGl,()=>gl],weight:[loadWt,renderWt,()=>wt],goals:[loadGo,renderGo,()=>go],rulebook:[loadRb,renderRb,()=>rb]}[v];
  if(T){if(T[2]()&&Date.now()-(loadedAt[v]||0)<FRESH)T[1]();else{loadedAt[v]=Date.now();T[0]()}}}
 for(const k in BTN)$(BTN[k]).onclick=()=>setView(view===k?'todos':k);
 $('#peopleBtn').onclick=()=>{$('#settings').close('cancel');setView('people')};$('#pBack').onclick=()=>setView('todos');
-$('#refresh').onclick=()=>view==='people'?loadPeople():view==='exercise'?loadEx():view==='meals'?loadMl():view==='glucose'?loadGl():view==='weight'?loadWt():view==='goals'?loadGo():load();
+$('#refresh').onclick=()=>view==='rulebook'?loadRb():view==='people'?loadPeople():view==='exercise'?loadEx():view==='meals'?loadMl():view==='glucose'?loadGl():view==='weight'?loadWt():view==='goals'?loadGo():load();
 
 
 // ---- Due dates & reminders ----
@@ -307,6 +307,30 @@ function editOpt(old){const n=prompt(`Rename "${old}" (leave empty to remove; pa
  if(v===old)return;commitMl(D=>{const i=D.mealOptions.indexOf(old);if(i<0)return;if(D.mealOptions.includes(v))D.mealOptions.splice(i,1);else D.mealOptions[i]=v},`Rename meal option ${old} → ${v}`)}
 $('#addOpt').onclick=()=>{if(!tok())return openSettings();if(!ml)return alert('Meals not loaded yet — tap ⟳');const v=(prompt('New meal option')||'').trim();if(!v)return;
  commitMl(D=>{D.mealOptions=D.mealOptions||[];if(!D.mealOptions.includes(v))D.mealOptions.push(v)},`Add meal option ${v}`)};
+
+// ---- Health rulebook (v25): HEALTH_RULEBOOK.md lives in the private data repo; nothing health-related ships in this public repo ----
+const RBAPI=`https://api.github.com/repos/${OWNER}/${REPO}/contents/HEALTH_RULEBOOK.md`;let rb=null;
+const rbmsg=m=>$('#rbdoc').innerHTML=`<p class="empty">${esc(m)}</p>`;
+async function loadRb(){if(!tok()){rbmsg('Add your GitHub key in ⚙ to load the rulebook.');return}if(!rb)rbmsg('Loading rulebook…');
+ try{const r=await fetch(RBAPI+'?ref='+BRANCH+'&t='+Date.now(),{headers:{Authorization:'Bearer '+tok(),Accept:'application/vnd.github.raw+json'},cache:'no-store'});
+  if(r.status===404){rb=null;rbmsg('No HEALTH_RULEBOOK.md in lorne-todos yet.');return}if(r.status===401||r.status===403)throw new Error('auth');if(!r.ok)throw new Error('HTTP '+r.status);
+  rb=await r.text();localStorage.setItem('rbcache',rb)}
+ catch(e){const c=localStorage.getItem('rbcache');if(c){rb=c;status('Offline/error — showing saved rulebook ('+e.message+')')}
+  else{rbmsg(e.message==='auth'?'GitHub key was rejected. Update it in ⚙.':'Could not load rulebook: '+e.message+'. Tap ⟳ to retry.');return}}
+ renderRb()}
+// tiny markdown: # headers, - / 1. lists, **bold**, *italic*, ---, paragraphs (escaped first)
+function mdInline(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\*(.+?)\*/g,'<i>$1</i>')}
+function md(src){let h='',list=null;const close=()=>{if(list){h+=`</${list}>`;list=null}};
+ for(const ln of src.split(/\r?\n/)){let m;
+  if(m=ln.match(/^(#{1,4})\s+(.*)/)){close();const n=Math.min(m[1].length+1,4);h+=`<h${n}>${mdInline(m[2])}</h${n}>`}
+  else if(m=ln.match(/^\s*[-*]\s+(.*)/)){if(list!=='ul'){close();h+='<ul>';list='ul'}h+=`<li>${mdInline(m[1])}</li>`}
+  else if(m=ln.match(/^\s*\d+\.\s+(.*)/)){if(list!=='ol'){close();h+='<ol>';list='ol'}h+=`<li>${mdInline(m[1])}</li>`}
+  else if(/^\s*(---|\*\*\*)\s*$/.test(ln)){close();h+='<hr>'}
+  else if(ln.trim()){close();h+=`<p>${mdInline(ln)}</p>`}
+  else close()}
+ close();return h}
+function renderRb(){if(rb!=null)$('#rbdoc').innerHTML=md(rb)}
+$('#rulebookBtn').onclick=()=>{$('#settings').close('cancel');setView('rulebook')};$('#rbBack').onclick=()=>setView('todos');
 
 // ---- Weight (Withings; synced by GitHub Action) ----
 const W_REDIRECT='https://lorneshantz.github.io/lorne-todos-app/';

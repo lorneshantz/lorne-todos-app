@@ -1,4 +1,4 @@
-const C='todos-shell-v24',SHELL=['./','index.html','app.js','goals-core.js','styles.css','manifest.json','icon-192.png','icon-512.png'];
+const C='todos-shell-v25',SHELL=['./','index.html','app.js','goals-core.js','styles.css','manifest.json','icon-192.png','icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(SHELL.map(u=>new Request(u,{cache:'reload'})))));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))));self.clients.claim()});
 // v24: shell served from cache first (fast, no radio wake), refreshed in the background; new versions arrive via the cache-name bump
