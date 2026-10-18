@@ -1,5 +1,5 @@
 // APP_VERSION: bump here only (keep sw.js cache name todos-shell-v<APP_VERSION> and index.html ?v= in step)
-const APP_VERSION='25';
+const APP_VERSION='26';
 const OWNER='lorneshantz',REPO='lorne-todos',PATH='todos.json',BRANCH='main';
 const API=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
 const $=s=>document.querySelector(s);let data=null,sha=null,editing=null;
@@ -38,11 +38,11 @@ var render=function(){const m=$('#lists');m.innerHTML='';if(!data)return;
   if(!items.length){const e=document.createElement('p');e.className='empty';e.textContent='No items';s.appendChild(e)}
   for(const t of items){const d=document.createElement('div');d.className='item'+(t.status==='complete'?' done':'');
    d.innerHTML=`<button class="chk">${t.status==='complete'?'✓':''}</button><div class="body"><div class="t">${t.recurrence?'<span title="Repeats">🔁</span> ':''}${esc(t.title)}</div>
-   <div class="meta">${t.assignee?'👤 '+esc(t.assignee)+' ':''}${t.due?`<span class="due${t.status!=='complete'&&dueAt(t)<Date.now()?' late':''}">📅 ${esc(fmtDue(t))}</span>`:''}</div>${t.steps&&t.steps.length?'<ul>'+t.steps.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}</div>${isOverdueRec(t)?'<button class="cu" title="Bring up to date">⏭</button>':''}<button class="ed">✎</button>`;
+   <div class="meta">${t.assignee?'👤 '+esc(t.assignee)+' ':''}${(t.media||[]).length?`<span title="Photos/videos">📎 ${t.media.length}</span> `:''}${t.due?`<span class="due${t.status!=='complete'&&dueAt(t)<Date.now()?' late':''}">📅 ${esc(fmtDue(t))}</span>`:''}</div>${t.steps&&t.steps.length?'<ul>'+t.steps.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':''}</div>${isOverdueRec(t)?'<button class="cu" title="Bring up to date">⏭</button>':''}<button class="ed">✎</button>`;
    d.querySelector('.chk').onclick=()=>{const nid=newId();commit(D=>{const x=D.todos.find(y=>y.id===t.id);if(x){x.status=x.status==='complete'?'open':'complete';x.updated=now();if(x.status==='complete')spawnNext(D,x,nid)}},`Toggle ${t.title}`)}
    d.querySelector('.ed').onclick=()=>openEdit(t);{const cb=d.querySelector('.cu');if(cb)cb.onclick=()=>catchUpItem(t.id)}s.appendChild(d)}m.appendChild(s)}
  if(!any)m.innerHTML='<p style="padding:14px;color:#666">Nothing to show.</p>'}
-function openEdit(t){editing=t.id;const F=$('#editForm');F.title.value=t.title;F.list.value=t.list;F.assignee.value=t.assignee||'';F.steps.value=(t.steps||[]).join('\n');F.status.value=t.status;F.due.value=t.due||'';F.dueTime.value=t.due?(t.dueTime||''):'';F.dueTime.disabled=!t.due;const rc=t.recurrence||{};F.rtype.value=rc.type||'';F.rint.value=rc.interval||1;F.rwd.value=String(rc.weekday??(t.due?pd(t.due).getDay():new Date().getDay()));F.rmd.value=rc.monthDay||(t.due?pd(t.due).getDate():new Date().getDate());rUI();{const od=isOverdueRec(t);$('#catchL').hidden=!od;if(od){const c=catchUpCalc(t.recurrence,t.due);$('#catchInfo').textContent=`missed ${c.skipped}, next ${c.next}`}}$('#edit').showModal()}
+function openEdit(t){editing=t.id;const F=$('#editForm');F.title.value=t.title;F.list.value=t.list;F.assignee.value=t.assignee||'';F.steps.value=(t.steps||[]).join('\n');F.status.value=t.status;F.due.value=t.due||'';F.dueTime.value=t.due?(t.dueTime||''):'';F.dueTime.disabled=!t.due;const rc=t.recurrence||{};F.rtype.value=rc.type||'';F.rint.value=rc.interval||1;F.rwd.value=String(rc.weekday??(t.due?pd(t.due).getDay():new Date().getDay()));F.rmd.value=rc.monthDay||(t.due?pd(t.due).getDate():new Date().getDate());rUI();{const od=isOverdueRec(t);$('#catchL').hidden=!od;if(od){const c=catchUpCalc(t.recurrence,t.due);$('#catchInfo').textContent=`missed ${c.skipped}, next ${c.next}`}}$('#edit').showModal();if(!mBusy)mmsgEl('');showMedia()}
 $('#edit').addEventListener('close',()=>{if($('#edit').returnValue!=='save')return;const F=$('#editForm'),id=editing;
  const v={title:F.title.value.trim(),list:F.list.value.trim()||'Inbox',assignee:F.assignee.value.trim(),steps:F.steps.value.split('\n').map(s=>s.trim()).filter(Boolean),status:F.status.value,due:F.due.value||'',dueTime:F.due.value?(F.dueTime.value||''):''};const rec=readRec(F),nid=newId();
  commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x)return;const wasDone=x.status==='complete';if(rec)x.recurrence=rec;else delete x.recurrence;const oldDue=x.due,oldTime=x.dueTime;Object.assign(x,v,{updated:now()});if(!x.assignee)delete x.assignee;if(!x.due)delete x.due;if(!x.dueTime||!x.due)delete x.dueTime;if(x.due!==oldDue||x.dueTime!==oldTime)unmark(x.id);if(!D.lists.includes(v.list))D.lists.push(v.list);if(!wasDone&&x.status==='complete')spawnNext(D,x,nid)},`Edit ${v.title}`)});
@@ -123,7 +123,8 @@ function notifUI(){const b=$('#notif');if(!('Notification' in window)){b.hidden=
  const p=Notification.permission;b.hidden=p==='granted'&&localStorage.getItem('pushOn')==='1';$('#notifBtn').hidden=p==='denied';
  $('#notifMsg').textContent=p==='denied'?'Reminders are blocked. Turn on notifications for this app in your phone Settings (iPhone: Settings › Notifications › To-Dos; Android: long-press icon › App info › Notifications).':'Get a reminder when a to-do is due.'}
 $('#notifBtn').onclick=async()=>{await Notification.requestPermission();notifUI();checkDue()};
-setInterval(()=>{if(document.hidden&&localStorage.getItem('pushOn')==='1')return;checkDue()},60000);// v24: in background, push covers reminders, so skip the checkdocument.addEventListener('visibilitychange',()=>{if(!document.hidden){checkDue();render()}});
+setInterval(()=>{if(document.hidden&&localStorage.getItem('pushOn')==='1')return;checkDue()},60000);// v24: in background, push covers reminders, so skip the check
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){checkDue();render()}});
 const _render=render;render=function(){_render();checkDue()};notifUI();
 navigator.serviceWorker&&navigator.serviceWorker.ready.then(async r=>{try{if('periodicSync' in r&&(await navigator.permissions.query({name:'periodic-background-sync'})).state==='granted')await r.periodicSync.register('due-check',{minInterval:15*60*1000})}catch(e){}});
 $('#editForm').due.addEventListener('input',e=>{const T=$('#editForm').dueTime;T.disabled=!e.target.value;if(!e.target.value)T.value=''});
@@ -532,3 +533,89 @@ $('#talkBtn').onclick=()=>{const t0=Date.now();let left=false;const onHide=()=>{
 setView(view);loadPeople();
 // v24: timers above skip work while hidden; catch up when the app comes back to the screen
 document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(view==='glucose'&&Date.now()-(loadedAt.glucose||0)>5*60000){loadedAt.glucose=Date.now();loadGl()}if(view==='goals'&&go&&!fastFix)renderFast()});
+
+// ---- Task photos & videos (v26) ----
+// Files live in the PRIVATE data repo at media/<taskId>/<stamp>.<ext> (never in this public repo or the Pages site);
+// todo.media=[{path,type:'image'|'video',added,size,sha}]. Photos: ≤1600 px JPEG 0.8. Videos: ≤30 s, re-encoded ≤720p ~1.2 Mbps webm. Hard cap 20 MB.
+const MAXB=20*1024*1024,MAXS=30,VBPS=1200000,ABPS=64000,MAPI_=p=>`https://api.github.com/repos/${OWNER}/${REPO}/contents/${p}`;
+const murl={};let mBusy=false,rec=null;
+function mmsgEl(m){const e=$('#mediaMsg');if(e)e.textContent=m||''}
+const mb=n=>(n/1048576).toFixed(1)+' MB';
+const MIME={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',heic:'image/heic',webm:'video/webm',mp4:'video/mp4',mov:'video/quicktime','3gp':'video/3gpp'};
+function extOf(b){const t=(b.type||'').split(';')[0].split('/')[1]||'';const e={jpeg:'jpg',quicktime:'mov','3gpp':'3gp'}[t]||t.replace(/^x-/,'');
+ if(/^[a-z0-9]{2,5}$/.test(e))return e;const n=((b.name||'').match(/\.([a-z0-9]{2,5})$/i)||[])[1];return n?n.toLowerCase():'bin'}
+function blob64(b){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]||'');r.onerror=()=>rej(r.error);r.readAsDataURL(b)})}
+function stamp(){const d=new Date();return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${Math.random().toString(36).slice(2,5)}`}
+const recType=()=>typeof MediaRecorder!=='undefined'&&['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm','video/mp4'].find(t=>MediaRecorder.isTypeSupported(t))||'';
+async function shrinkPhoto(f){try{const bm=await createImageBitmap(f),k=Math.min(1,1600/Math.max(bm.width,bm.height)),c=document.createElement('canvas');
+ c.width=Math.round(bm.width*k);c.height=Math.round(bm.height*k);c.getContext('2d').drawImage(bm,0,0,c.width,c.height);if(bm.close)bm.close();
+ const b=await new Promise(r=>c.toBlob(r,'image/jpeg',0.8));if(b&&b.size)return b}catch(e){}return f}// can't decode (e.g. HEIC): send as-is
+function vidMeta(src){return new Promise((res,rej)=>{const v=document.createElement('video');v.preload='auto';v.muted=true;v.playsInline=true;
+ v.onloadedmetadata=()=>res(v);v.onerror=()=>rej(new Error('Could not read that video'));v.src=src})}
+// re-encode in real time: draw frames to a ≤720p canvas, record canvas + audio with MediaRecorder, stop at `keep` seconds
+async function squeeze(v,keep){const type=recType(),w0=v.videoWidth,h0=v.videoHeight;if(!type||!w0||!h0||!HTMLCanvasElement.prototype.captureStream)return null;
+ const k=Math.min(1,1280/Math.max(w0,h0),720/Math.min(w0,h0)),c=document.createElement('canvas');c.width=Math.max(2,Math.round(w0*k/2)*2);c.height=Math.max(2,Math.round(h0*k/2)*2);
+ const g=c.getContext('2d'),vs=c.captureStream(30),tracks=[...vs.getVideoTracks()];let ac=null;
+ try{ac=new AudioContext();const dst=ac.createMediaStreamDestination();ac.createMediaElementSource(v).connect(dst);tracks.push(...dst.stream.getAudioTracks());await ac.resume();v.muted=false}catch(e){ac=null;v.muted=true}
+ const mr=new MediaRecorder(new MediaStream(tracks),{mimeType:type,videoBitsPerSecond:VBPS,audioBitsPerSecond:ABPS}),parts=[];
+ mr.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};const stopped=new Promise(r=>mr.onstop=r);
+ const box=$('#mPrev');v.className='mprev';box.replaceChildren(v);box.hidden=false;// on screen so Chrome keeps decoding
+ let over=false;const finish=()=>{if(over)return;over=true;v.pause();if(mr.state!=='inactive')mr.stop()};
+ const draw=()=>{if(over)return;g.drawImage(v,0,0,c.width,c.height);mmsgEl(`Compressing video… ${Math.min(keep,v.currentTime).toFixed(0)} / ${Math.round(keep)} s`);
+  if(v.currentTime>=keep||v.ended)return finish();v.requestVideoFrameCallback?v.requestVideoFrameCallback(draw):requestAnimationFrame(draw)};
+ v.onended=finish;const guard=setTimeout(finish,(keep+20)*1000);
+ try{v.currentTime=0;mr.start(1000);try{await v.play()}catch(e){if(v.muted)throw e;v.muted=true;await v.play()}draw();await stopped}
+ finally{clearTimeout(guard);finish();vs.getTracks().forEach(t=>t.stop());if(ac)ac.close().catch(()=>{});box.hidden=true;box.replaceChildren()}
+ const b=new Blob(parts,{type:type.split(';')[0]});return b.size?b:null}
+async function addVideoFile(f,id){mBusy=true;mmsgEl('Reading video…');const url=URL.createObjectURL(f);let v=null,out=null,dur=0;
+ try{v=await vidMeta(url);dur=isFinite(v.duration)?v.duration:0;const long=dur>MAXS+0.5;
+  if(long&&!confirm(`That clip is ${Math.round(dur)} s. Videos are capped at ${MAXS} s.\n\nOK = keep the first ${MAXS} s\nCancel = pick a shorter clip`)){mBusy=false;mmsgEl('');return}
+  try{out=await squeeze(v,Math.min(dur||MAXS,MAXS))}catch(e){console.warn('compress failed',e)}
+  if(!out||(!long&&out.size>=f.size)){if(long){mBusy=false;mmsgEl('');return alert(`Couldn't trim this clip on this phone. Trim it to ${MAXS} s in Gallery (Edit › trim) or use 🎥 Video to record.`)}out=f}}
+ catch(e){mBusy=false;mmsgEl('');return alert(e.message)}finally{URL.revokeObjectURL(url);if(v)v.removeAttribute('src')}
+ mBusy=false;return uploadMedia(id,out,'video')}
+async function uploadMedia(id,b,type){const what=type==='video'?'video':'photo';
+ if(b.size>MAXB){mmsgEl('');return alert(`That ${what} is ${mb(b.size)} — the limit is 20 MB.${type==='video'?' Try a shorter clip (under 30 s).':''}`)}
+ if(!navigator.onLine){mmsgEl('');return alert('Offline — attachments need a connection')}
+ mBusy=true;const t=data&&data.todos.find(y=>y.id===id),path=`media/${String(id).replace(/[^\w-]/g,'_')}/${stamp()}.${extOf(b)}`;
+ try{mmsgEl(`Uploading ${what} (${mb(b.size)})…`);
+  const r=await fetch(MAPI_(path),{method:'PUT',headers:H(),body:JSON.stringify({message:`Attach ${what} to to-do ${id}`,content:await blob64(b),branch:BRANCH})});
+  if(!r.ok)throw new Error(r.status===413?'file too large for GitHub':'HTTP '+r.status);
+  const m={path,type,added:now(),size:b.size,sha:(await r.json()).content.sha};murl[path]=Promise.resolve(URL.createObjectURL(b));
+  await commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x)return;x.media=x.media||[];if(!x.media.some(z=>z.path===path))x.media.push(m);x.updated=now()},`Attach ${what} to ${t?t.title:id}`);
+  mmsgEl('');toast(type==='video'?'🎥 Video attached ✓':'📷 Photo attached ✓')}
+ catch(e){mmsgEl('');alert('Could not attach: '+e.message)}finally{mBusy=false;showMedia()}}
+function mediaUrl(path){if(!murl[path])murl[path]=fetch(MAPI_(path)+'?ref='+BRANCH,{headers:{Authorization:'Bearer '+tok(),Accept:'application/vnd.github.raw+json'},cache:'no-store'})
+  .then(async r=>{if(!r.ok)throw new Error(r.status===404?'file missing':'HTTP '+r.status);const b=await r.blob();return URL.createObjectURL(new Blob([b],{type:MIME[(path.split('.').pop()||'').toLowerCase()]||b.type}))})
+  .catch(e=>{delete murl[path];throw e});return murl[path]}
+// MediaRecorder webm has no duration header: seek to the end once so the scrubber works
+function fixDur(v){v.addEventListener('loadedmetadata',()=>{if(v.duration!==Infinity)return;v.currentTime=1e101;v.addEventListener('timeupdate',function f(){v.removeEventListener('timeupdate',f);v.currentTime=0})})}
+function showMedia(){const L=$('#mediaList');if(!L||!$('#edit').open||!data)return;const t=data.todos.find(y=>y.id===editing),ms=(t&&t.media)||[];
+ L.innerHTML=ms.map((m,i)=>`<div class="mthumb" data-i="${i}">${m.type==='video'?'<video controls playsinline preload="metadata"></video>':'<img alt="Photo">'}<button type="button" class="mdel" title="Remove" aria-label="Remove">✕</button></div>`).join('');
+ L.querySelectorAll('.mthumb').forEach(el=>{const m=ms[+el.dataset.i],md=el.querySelector('img,video');el.querySelector('.mdel').onclick=()=>delMedia(t.id,m);
+  if(md.tagName==='IMG')md.onclick=()=>{if(md.requestFullscreen)md.requestFullscreen().catch(()=>{})};else fixDur(md);
+  mediaUrl(m.path).then(u=>{md.src=u}).catch(e=>el.insertAdjacentHTML('beforeend',`<div class="meta">⚠ ${esc(e.message)}</div>`))})}
+async function delMedia(id,m){if(mBusy)return toast('Still working on the last one…');if(!confirm(`Remove this ${m.type==='video'?'video':'photo'}?`))return;mBusy=true;mmsgEl('Removing…');
+ try{let sha=m.sha;if(!sha){const g=await fetch(MAPI_(m.path)+'?ref='+BRANCH,{headers:H(),cache:'no-store'});if(g.ok)sha=(await g.json()).sha}
+  if(sha){const r=await fetch(MAPI_(m.path),{method:'DELETE',headers:H(),body:JSON.stringify({message:`Remove attachment from to-do ${id}`,sha,branch:BRANCH})});if(!r.ok&&r.status!==404)throw new Error('HTTP '+r.status)}
+  await commit(D=>{const x=D.todos.find(y=>y.id===id);if(!x||!x.media)return;x.media=x.media.filter(z=>z.path!==m.path);if(!x.media.length)delete x.media;x.updated=now()},'Remove attachment');
+  if(murl[m.path])murl[m.path].then(u=>URL.revokeObjectURL(u)).catch(()=>{});delete murl[m.path];toast('Removed')}
+ catch(e){alert('Could not remove: '+e.message)}finally{mBusy=false;mmsgEl('');showMedia()}}
+// 🎥 Video = in-app recorder (back camera, auto-stops at 30 s, recorded at ~1.2 Mbps so no re-encode); falls back to the camera app
+async function startRec(){if(mBusy||rec)return toast('Still working on the last one…');const id=editing,type=recType();
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!type)return $('#mVid').click();
+ let s;try{s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30,max:30}},audio:true})}
+ catch(e){try{s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}})}catch(e2){return alert('Camera blocked. Allow camera for this app (long-press the icon › App info › Permissions), or use 🖼 Library.')}}
+ const mr=new MediaRecorder(s,{mimeType:type,videoBitsPerSecond:VBPS,audioBitsPerSecond:ABPS}),parts=[],t0=Date.now(),pv=$('#recPrev');let keep=true,tick=0;
+ const end=()=>{clearInterval(tick);if(mr.state!=='inactive')mr.stop()};rec={end,cancel:()=>{keep=false;end()}};
+ mr.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
+ mr.onstop=()=>{s.getTracks().forEach(t=>t.stop());pv.srcObject=null;$('#recBox').hidden=true;$('#mBtns').hidden=false;rec=null;if(!keep)return mmsgEl('');
+  const b=new Blob(parts,{type:type.split(';')[0]});if(!b.size)return alert('Nothing was recorded — try again.');uploadMedia(id,b,'video')};
+ pv.srcObject=s;pv.play().catch(()=>{});$('#recBox').hidden=false;$('#mBtns').hidden=true;mmsgEl('Recording… stops by itself at 30 s');
+ const upd=()=>{const left=MAXS-Math.floor((Date.now()-t0)/1000);$('#recStop').textContent=`■ Stop · ${Math.max(0,left)} s`;if(left<=0)end()};upd();tick=setInterval(upd,250);mr.start(1000)}
+$('#mRec').onclick=startRec;$('#recStop').onclick=()=>rec&&rec.end();$('#recX').onclick=()=>rec&&rec.cancel();
+$('#edit').addEventListener('close',()=>{if(rec)rec.end()});// closing the dialog mid-recording keeps the clip
+function onPick(inp){inp.onchange=async()=>{const f=inp.files[0],id=editing;inp.value='';if(!f||!id)return;if(mBusy)return toast('Still working on the last one…');if(!tok())return openSettings();
+ if(/^video\//.test(f.type)||/\.(mp4|mov|webm|3gp|mkv)$/i.test(f.name))return addVideoFile(f,id);
+ mBusy=true;mmsgEl('Shrinking photo…');let b;try{b=await shrinkPhoto(f)}finally{mBusy=false}uploadMedia(id,b,'image')}}
+['#mPhoto','#mPick','#mVid'].forEach(s=>onPick($(s)));
